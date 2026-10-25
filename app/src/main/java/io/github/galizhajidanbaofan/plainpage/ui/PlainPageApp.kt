@@ -1,12 +1,22 @@
 package io.github.galizhajidanbaofan.plainpage.ui
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -16,9 +26,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -40,6 +53,8 @@ import io.github.galizhajidanbaofan.plainpage.ui.recent.RecentScreen
 import io.github.galizhajidanbaofan.plainpage.ui.settings.SettingsScreen
 import io.github.galizhajidanbaofan.plainpage.ui.shelf.ShelfScreen
 import io.github.galizhajidanbaofan.plainpage.ui.theme.PlainPageTheme
+import io.github.galizhajidanbaofan.plainpage.ui.theme.LocalTextStyles
+import io.github.galizhajidanbaofan.plainpage.ui.theme.LocalThemeTokens
 import io.github.galizhajidanbaofan.plainpage.ui.theme.ThemeTokensCatalog
 
 private enum class Destination(val route: String, @StringRes val labelRes: Int) {
@@ -132,24 +147,54 @@ private fun importRejectionText(reason: ImportRejection): String = when (reason)
     ImportRejection.IO_ERROR -> stringResource(R.string.import_reason_io)
 }
 
+/**
+ * 底部导航做成一行字，而不是 Material 的图标条：
+ * 只有三个去处、且都是文字语义（书架/最近/设置），加图标只会多一层噪音。
+ * 选中态用强调色 + 一条 2dp 的墨线，和书架里的进度线是同一个语汇。
+ */
 @Composable
 private fun PlainPageBottomBar(navController: NavHostController, currentRoute: String?) {
-    NavigationBar {
-        Destination.entries.forEach { destination ->
-            NavigationBarItem(
-                selected = currentRoute == destination.route,
-                onClick = {
-                    if (currentRoute != destination.route) {
-                        navController.navigate(destination.route) {
-                            popUpTo(navController.graph.startDestinationId) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
+    val tokens = LocalThemeTokens.current
+    val styles = LocalTextStyles.current
+    Surface(color = tokens.paper) {
+        Column {
+            HorizontalDivider(color = tokens.divider, thickness = 1.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                Destination.entries.forEach { destination ->
+                    val selected = currentRoute == destination.route
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(enabled = !selected) {
+                                navController.navigate(destination.route) {
+                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                            .padding(vertical = 10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = stringResource(destination.labelRes),
+                            style = styles.screenTitle,
+                            color = if (selected) tokens.accent else tokens.textSecondary,
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .width(16.dp)
+                                .height(2.dp)
+                                .background(if (selected) tokens.accent else Color.Transparent),
+                        )
                     }
-                },
-                icon = {},
-                label = { Text(stringResource(destination.labelRes)) },
-            )
+                }
+            }
         }
     }
 }

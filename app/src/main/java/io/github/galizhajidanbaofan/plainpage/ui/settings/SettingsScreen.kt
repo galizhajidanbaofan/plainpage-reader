@@ -1,6 +1,9 @@
 package io.github.galizhajidanbaofan.plainpage.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,27 +11,30 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.galizhajidanbaofan.plainpage.R
 import io.github.galizhajidanbaofan.plainpage.ui.AppearanceState
 import io.github.galizhajidanbaofan.plainpage.ui.ReadingMode
 import io.github.galizhajidanbaofan.plainpage.ui.ShelfLayout
+import io.github.galizhajidanbaofan.plainpage.ui.theme.LocalTextStyles
+import io.github.galizhajidanbaofan.plainpage.ui.theme.LocalThemeTokens
 import io.github.galizhajidanbaofan.plainpage.ui.theme.ReadingTheme
 
 /**
- * 外观设置。阶段 1 提供三组纯 UI 开关（阅读主题 / 书架布局 / 翻页方式），
- * 直接把状态写回 [onAppearanceChange]；阶段 2 会换成 ViewModel + DataStore 持久化，
- * 界面代码不需要改。
+ * 外观设置。三组纯 UI 开关（阅读主题 / 书架布局 / 翻页方式），直接把状态写回
+ * [onAppearanceChange]；持久化在 Repository 那一层，界面代码不需要改。
+ *
+ * 选择器做成「字 + 下划线」而不是按钮：纸面上没有凸起的按钮，只有被划出来的一行字。
  */
 @Composable
 fun SettingsScreen(
@@ -36,21 +42,25 @@ fun SettingsScreen(
     onAppearanceChange: (AppearanceState) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(color = MaterialTheme.colorScheme.background, modifier = modifier.fillMaxSize()) {
+    val tokens = LocalThemeTokens.current
+    val styles = LocalTextStyles.current
+    Surface(color = tokens.paper, modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 22.dp),
         ) {
+            Spacer(modifier = Modifier.height(22.dp))
             Text(
-                text = stringResource(R.string.settings_appearance),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
+                text = stringResource(R.string.settings_kicker),
+                style = styles.kicker,
+                color = tokens.textSecondary,
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = tokens.divider, thickness = 1.dp)
 
-            OptionRow(
+            OptionSection(
                 title = stringResource(R.string.settings_reading_theme),
                 options = listOf(
                     ReadingTheme.LIGHT to stringResource(R.string.theme_light),
@@ -60,7 +70,7 @@ fun SettingsScreen(
                 selected = appearance.theme,
                 onSelected = { onAppearanceChange(appearance.copy(theme = it)) },
             )
-            OptionRow(
+            OptionSection(
                 title = stringResource(R.string.settings_shelf_layout),
                 options = listOf(
                     ShelfLayout.LIST to stringResource(R.string.layout_list),
@@ -69,7 +79,7 @@ fun SettingsScreen(
                 selected = appearance.shelfLayout,
                 onSelected = { onAppearanceChange(appearance.copy(shelfLayout = it)) },
             )
-            OptionRow(
+            OptionSection(
                 title = stringResource(R.string.settings_reading_mode),
                 options = listOf(
                     ReadingMode.PAGED to stringResource(R.string.mode_paged),
@@ -78,34 +88,49 @@ fun SettingsScreen(
                 selected = appearance.readingMode,
                 onSelected = { onAppearanceChange(appearance.copy(readingMode = it)) },
             )
+            Spacer(modifier = Modifier.height(28.dp))
         }
     }
 }
 
 @Composable
-private fun <T> OptionRow(
+private fun <T> OptionSection(
     title: String,
     options: List<Pair<T, String>>,
     selected: T,
     onSelected: (T) -> Unit,
 ) {
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .padding(vertical = 8.dp)) {
+    val tokens = LocalThemeTokens.current
+    val styles = LocalTextStyles.current
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp)) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onBackground,
+            style = styles.meta,
+            color = tokens.textSecondary,
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             options.forEach { (value, label) ->
-                if (value == selected) {
-                    FilledTonalButton(onClick = { onSelected(value) }) { Text(label) }
-                } else {
-                    OutlinedButton(onClick = { onSelected(value) }) { Text(label) }
+                val isSelected = value == selected
+                Column(
+                    modifier = Modifier.clickable { onSelected(value) },
+                ) {
+                    Text(
+                        text = label,
+                        style = styles.screenTitle,
+                        color = if (isSelected) tokens.accent else tokens.textSecondary,
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(18.dp)
+                            .height(2.dp)
+                            .background(if (isSelected) tokens.accent else Color.Transparent),
+                    )
                 }
             }
         }
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(color = tokens.divider, thickness = 1.dp)
     }
 }

@@ -46,17 +46,21 @@
 
 本机跑不起 Android 模拟器（宿主虚拟化与图形都不满足，详见 [docs/preview-device.md](docs/preview-device.md)），所以用 Robolectric 的原生图形把 Compose 界面**真的画成 PNG**：`./gradlew :app:testDebugUnitTest --tests "*ScreenshotTest*"`，产物在 `app/build/screenshots/`，仓库里同步了一份。
 
-| 书架 · 列表（浅色） | 书架 · 网格（浅色） | 书架 · 列表（深色） | 书架 · 网格（护眼） |
+| 书架 · 列表（浅色） | 书架 · 网格（浅色） | 空书架 |
+|---|---|---|
+| ![](docs/screenshots/01-shelf-list-light.png) | ![](docs/screenshots/02-shelf-grid-light.png) | ![](docs/screenshots/05-shelf-empty.png) |
+
+| 书架 · 列表（深色） | 书架 · 网格（护眼） | 设置（浅色） | 设置（深色） |
 |---|---|---|---|
-| ![](docs/screenshots/01-shelf-list-light.png) | ![](docs/screenshots/02-shelf-grid-light.png) | ![](docs/screenshots/03-shelf-list-dark.png) | ![](docs/screenshots/04-shelf-grid-sepia.png) |
+| ![](docs/screenshots/03-shelf-list-dark.png) | ![](docs/screenshots/04-shelf-grid-sepia.png) | ![](docs/screenshots/10-settings-light.png) | ![](docs/screenshots/11-settings-dark.png) |
 
 | 阅读 · 浅色 | 阅读 · 护眼 | 阅读 · 深色 | 引擎未接入 |
 |---|---|---|---|
 | ![](docs/screenshots/06-reader-light.png) | ![](docs/screenshots/07-reader-sepia.png) | ![](docs/screenshots/08-reader-dark.png) | ![](docs/screenshots/09-reader-unsupported.png) |
 
-空书架状态：[docs/screenshots/05-shelf-empty.png](docs/screenshots/05-shelf-empty.png)
+设计取向与规则（配色、字阶、间距、为什么不用卡片和浮动按钮）写在 [docs/design-system.md](docs/design-system.md)。
 
-这些图验证的是**渲染与布局**（列表/网格结构、三种配色、超长书名省略、最近阅读时间格式、正文行距与翻页条）。点击、返回键、SAF 选择器、Room 落库等行为仍必须上设备验证——截图通过 ≠ 功能通过。
+这些图验证的是**渲染与布局**（列表/网格结构、三种配色、超长书名省略、最近阅读时间格式、正文段首缩进与翻页条）。点击、返回键、SAF 选择器、Room 落库等行为仍必须上设备验证——截图通过 ≠ 功能通过。
 
 ---
 

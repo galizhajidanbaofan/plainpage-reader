@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
 import io.github.galizhajidanbaofan.plainpage.domain.model.Book
 import io.github.galizhajidanbaofan.plainpage.domain.model.BookFormat
+import io.github.galizhajidanbaofan.plainpage.domain.model.ReadingLocation
 import io.github.galizhajidanbaofan.plainpage.ui.ShelfLayout
 import io.github.galizhajidanbaofan.plainpage.ui.shelf.ShelfScreen
 import io.github.galizhajidanbaofan.plainpage.ui.theme.PlainPageTheme
@@ -61,6 +62,7 @@ class ShelfScreenshotTest {
             byteSize = 780_000L,
             importedAt = now - 20 * day,
             lastOpenedAt = now - 2 * day,
+            readingLocation = ReadingLocation.Txt(charOffset = 320_000, chapterIndex = 7, fraction = 0.42f),
         ),
         Book(
             id = 3,
@@ -82,6 +84,7 @@ class ShelfScreenshotTest {
             byteSize = 120_000L,
             importedAt = now - 3 * day,
             lastOpenedAt = null,
+            readingLocation = ReadingLocation.Txt(charOffset = 4_000, chapterIndex = 1, fraction = 0.06f),
         ),
     )
 

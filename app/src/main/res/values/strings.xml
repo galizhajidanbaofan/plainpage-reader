@@ -5,8 +5,11 @@
     <string name="nav_recent">最近</string>
     <string name="nav_settings">设置</string>
 
+    <string name="shelf_kicker_count">离线书架 · %1$d 本</string>
+    <string name="shelf_empty_kicker">离线 · 不联网 · 不收集</string>
+    <string name="shelf_import_cta">导入第一本书</string>
     <string name="shelf_empty_title">书架还空着</string>
-    <string name="shelf_empty_hint">支持 EPUB / TXT / PDF，导入后复制到应用私有目录，原文件不会被改动。</string>
+    <string name="shelf_empty_hint">支持 EPUB / TXT / PDF；导入后复制到应用私有目录，原文件不动。</string>
     <string name="shelf_import">导入</string>
     <string name="shelf_importing">导入中…</string>
     <string name="shelf_meta">%1$s · %2$s · %3$s</string>
@@ -16,7 +19,10 @@
     <string name="recent_empty_title">还没有阅读记录</string>
     <string name="recent_empty_hint">打开过的书会按最近阅读时间排在这里。</string>
 
+    <string name="recent_kicker">最近阅读 · %1$d 本</string>
+
     <string name="action_delete">删除</string>
+    <string name="action_more">更多操作</string>
     <string name="action_cancel">取消</string>
     <string name="action_back">返回书架</string>
 
@@ -29,6 +35,7 @@
     <string name="import_reason_io">写入私有目录失败</string>
 
     <string name="reader_toc">目录</string>
+    <string name="reader_kicker_chapters">共 %1$d 章</string>
     <string name="reader_toc_page">第 %1$d 页</string>
     <string name="reader_prev_page">上一页</string>
     <string name="reader_next_page">下一页</string>
@@ -43,6 +50,7 @@
     <string name="reader_error_unknown">打开失败：未知错误</string>
 
     <string name="settings_appearance">外观</string>
+    <string name="settings_kicker">偏好 · 只存本机</string>
     <string name="settings_reading_theme">阅读主题</string>
     <string name="settings_shelf_layout">书架布局</string>
     <string name="settings_reading_mode">翻页方式</string>

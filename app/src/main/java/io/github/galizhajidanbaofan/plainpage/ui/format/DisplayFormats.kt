@@ -61,6 +61,15 @@ object DisplayFormats {
         }
     }
 
+    /**
+     * 能画成进度条的比例：只有 TXT 手里是**真·全文比例**。
+     * EPUB 目前只存章内位置、PDF 只存页码，分母未知，宁可留白也不画一条会骗人的进度条。
+     */
+    fun barFraction(location: ReadingLocation?): Float? = when (location) {
+        is ReadingLocation.Txt -> location.fraction.coerceIn(0f, 1f)
+        else -> null
+    }
+
     /** 阅读进度的一句话摘要；没有进度返回 null。 */
     fun progressSummary(location: ReadingLocation?): String? = when (location) {
         null -> null
