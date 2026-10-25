@@ -22,6 +22,7 @@
 | Room Runtime / KTX | `androidx.room:room-runtime:2.8.5`、`room-ktx:2.8.5` | Apache-2.0 | POM 已直接核实 | implementation |
 | Room Compiler | `androidx.room:room-compiler:2.8.5` | Apache-2.0 | POM 已直接核实 | ksp（构建期，不进 APK） |
 | KSP Gradle 插件 / symbol-processing-api | `com.google.devtools.ksp:2.3.12` | Apache-2.0 | POM 已直接核实（插件页与 api 两处均为 `The Apache License, Version 2.0`） | 构建期插件 |
+| org.jspecify:jspecify | `org.jspecify:jspecify:1.0.0`（`androidx.annotation` 传递依赖） | Apache-2.0 | POM 已直接核实（1.0.0 / 1.0.1 两版均为 `The Apache License, Version 2.0`） | implementation（编译期注解，运行时无行为） |
 | kotlinx-coroutines-android | `org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0` | Apache-2.0 | POM 已直接核实 | implementation |
 | Kotlin Stdlib | 由 Kotlin 插件注入（**2.3.20**） | Apache-2.0 | JetBrains 统一许可 | implementation |
 | JUnit 4 | `junit:junit:4.13.2` | **EPL-1.0** | POM 已直接核实 | **testImplementation**（不进 APK） |
@@ -54,5 +55,5 @@
 ## 四、待办
 
 - [x] 阶段 2：Room / KSP / Navigation 版本落地，POM 许可证已逐条核实并回填本节
-- [ ] 跑一次 `./gradlew :app:dependencies`，确保依赖树里每个 artifact 都出现在本表（尚未执行）
+- [x] 跑过 `:app:dependencies --configuration debugRuntimeClasspath`：实测 **119 个 artifact**，除表中已列项外只有 `org.jspecify:jspecify`（已补入上表）；无 AGPL/GPL、无 BouncyCastle、无 Guava
 - [ ] 发布前：生成 `THIRD-PARTY-NOTICES` 的最终版并打进 APK 的 `META-INF/`（或提供应用内「开源许可」页）
