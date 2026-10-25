@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application)
     // AGP 9 起 Kotlin 支持内置，不再需要 org.jetbrains.kotlin.android 插件。
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -65,6 +66,11 @@ kotlin {
     }
 }
 
+ksp {
+    // 导出 Room schema：数据库升级时才有据可查（提交进仓库，供 migration 测试使用）。
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -72,6 +78,10 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
+
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

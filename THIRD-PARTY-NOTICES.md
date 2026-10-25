@@ -6,9 +6,9 @@
 - 判定原则：只接受 Apache-2.0 / MIT / BSD；**拒绝 AGPL、SSPL、GPL**；LGPL / MPL 需单独评估并记录结论；许可证不明视为拒绝。
 - 取证方式：Maven POM 的 `<licenses>` 块、AAR 内 `META-INF/`、上游仓库 `LICENSE`。证据必须是一个可复核的 URL。
 
-## 一、已确认引入（阶段 1 骨架，构建已通过）
+## 一、已确认引入（阶段 2，构建已通过）
 
-`implementation` 的依赖会打进 APK；`testImplementation` 只在开发/CI 上跑，**不随 APK 分发**。
+`implementation` 的依赖会打进 APK；`testImplementation` / `ksp` 只在开发或构建期使用（KSP 是编译器插件，不进 APK）。
 
 | 名称 | 坐标 / 版本 | 许可证 | 取证 | 作用域 |
 |---|---|---|---|---|
@@ -18,24 +18,27 @@
 | Compose Material 3 | 由 BOM 定版 | Apache-2.0 | 与 ui 同源（AndroidX），未单独取证 | implementation |
 | Activity Compose | `androidx.activity:activity-compose:1.13.0` | Apache-2.0 | AndroidX 统一许可，未单独取证 | implementation |
 | Lifecycle Runtime/ViewModel Compose | `androidx.lifecycle:*:2.11.0` | Apache-2.0 | 同上 | implementation |
-| Navigation Compose | `androidx.navigation:navigation-compose:2.10.2` | Apache-2.0 | 同上 | implementation |
+| Navigation Compose | `androidx.navigation:navigation-compose:2.10.2` | Apache-2.0 | POM 已直接核实（`The Apache Software License, Version 2.0`） | implementation |
+| Room Runtime / KTX | `androidx.room:room-runtime:2.8.5`、`room-ktx:2.8.5` | Apache-2.0 | POM 已直接核实 | implementation |
+| Room Compiler | `androidx.room:room-compiler:2.8.5` | Apache-2.0 | POM 已直接核实 | ksp（构建期，不进 APK） |
+| KSP Gradle 插件 / symbol-processing-api | `com.google.devtools.ksp:2.3.12` | Apache-2.0 | POM 已直接核实（插件页与 api 两处均为 `The Apache License, Version 2.0`） | 构建期插件 |
 | kotlinx-coroutines-android | `org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0` | Apache-2.0 | POM 已直接核实 | implementation |
-| Kotlin Stdlib | 由 Kotlin Gradle 插件注入（2.4.10） | Apache-2.0 | JetBrains 统一许可 | implementation |
+| Kotlin Stdlib | 由 Kotlin 插件注入（**2.3.20**） | Apache-2.0 | JetBrains 统一许可 | implementation |
 | JUnit 4 | `junit:junit:4.13.2` | **EPL-1.0** | POM 已直接核实 | **testImplementation**（不进 APK） |
-| kotlin-test (JUnit) | `org.jetbrains.kotlin:kotlin-test-junit:2.4.10` | Apache-2.0 | POM 已直接核实 | testImplementation |
+| kotlin-test (JUnit) | `org.jetbrains.kotlin:kotlin-test-junit:2.3.20` | Apache-2.0 | POM 已直接核实 | testImplementation |
 
-> EPL-1.0 说明：JUnit 4 是弱 copyleft，但仅作为开发期测试框架使用、不随产物分发，因此不影响本项目 Apache-2.0 主许可证与对外分发。已在 `app/build.gradle.kts` 中限定为 `testImplementation`，若未来需要更干净的许可证面，可换 TestNG（Apache-2.0）。
+> Kotlin 定在 **2.3.20** 而非最新的 2.4.x：KSP 当前最新版 `2.3.12` 是面向 Kotlin 2.3.20 构建的，Maven Central 上不存在 `2.4.x` 版本的 KSP。用 2.4.10 时 `:app:kspDebugKotlin` 直接 `ExceptionInInitializerError`。Room 需要 KSP，所以 Kotlin 跟着 KSP 走；等 KSP 跟进 2.4 再升。`lintDebug` 里 3 条 `NewerVersionAvailable` 警告就是这个已知取舍，**不是遗漏**。
+
+> EPL-1.0 说明：JUnit 4 是弱 copyleft，但仅作开发期测试框架、不随产物分发，因此不影响 Apache-2.0 主许可证与对外分发。已限定为 `testImplementation`。若需更干净的许可证面，可换 TestNG（Apache-2.0）。
 
 ## 二、计划引入（引入时逐项复核版本与传递依赖）
 
 | 名称 | 用途 | 预期许可证 | 传递依赖风险 |
 |---|---|---|---|
-| Room + KSP | 书目 / 进度持久化 | Apache-2.0 | KSP 为 Apache-2.0，需再次核对 |
-| DataStore (Preferences) | 外观设置 | Apache-2.0 | 低 |
-| kotlinx-serialization（可选） | 进度 locator 序列化 | Apache-2.0 | 若不需要则不引 |
+| DataStore (Preferences) | 外观设置持久化 | Apache-2.0 | 低 |
 | androidx.test（ext:junit / runner） | 仪器测试 | Apache-2.0 | 仅 androidTest，不进 release |
 
-> 注：以上为「计划」，版本号在 `gradle/libs.versions.toml` 落地后回填到本表，并补上 POM 证据链接。
+> 注：版本号在 `gradle/libs.versions.toml` 落地后回填到本表，并补上 POM 证据链接。Room + KSP 已从本表转入「已确认引入」。
 
 ## 三、已评估并**放弃**引入
 
@@ -50,6 +53,6 @@
 
 ## 四、待办
 
-- [ ] 阶段 1：`libs.versions.toml` 落地后，把「计划引入」逐条转成「已确认引入」并补 POM 证据
-- [ ] 阶段 1：跑一次 `./gradlew :app:dependencies`，确保依赖树里每个 artifact 都出现在本表
+- [x] 阶段 2：Room / KSP / Navigation 版本落地，POM 许可证已逐条核实并回填本节
+- [ ] 跑一次 `./gradlew :app:dependencies`，确保依赖树里每个 artifact 都出现在本表（尚未执行）
 - [ ] 发布前：生成 `THIRD-PARTY-NOTICES` 的最终版并打进 APK 的 `META-INF/`（或提供应用内「开源许可」页）

@@ -17,20 +17,26 @@
 
 ## 状态（务必先读）
 
-**当前：构建体系已打通并实测通过，应用功能代码尚未开始。**「能构建出空壳 APK」≠「阅读器能用」，下表是诚实的进度记录。
+**当前：构建通过、书架与导入代码已落地并有单测覆盖，但三种格式的解析引擎还没写，阅读页是占位页。** 也就是说——APK 装上去能看到书架、能选文件导入，点进去还看不到正文。下表是诚实进度。
 
 | 能力 | 代码 | 构建 | 真机验收 |
 |---|---|---|---|
 | 仓库骨架 / 许可证 / 文档 | ✅ | — | — |
-| 构建体系（Gradle 9.8.2 / AGP 9.4.1 / Kotlin 2.4.10 / compileSdk 37） | ✅ | ✅ 通过 | — |
-| 外观注入骨架（AppearanceRepository / ThemeTokens / 13 个单测） | ✅ | ✅ 通过 | 未验证 |
-| 书架 / 导入 / 三格式打开 | 未开始 | — | 未验证 |
-| 进度记忆 / 目录跳转 | 未开始 | — | 未验证 |
+| 构建体系（Gradle 9.8.2 / AGP 9.4.1 / Kotlin 2.3.20 / compileSdk 37） | ✅ | ✅ 通过 | — |
+| 外观注入骨架（AppearanceRepository / ThemeTokens） | ✅ | ✅ 通过 | 未验证 |
+| Room 数据层（book 表、书架/最近两个 Flow、进度字段） | ✅ | ✅ 通过 | 未验证 |
+| SAF 导入（复制到私有目录、300 MB 上限、流式写入、来源记录） | ✅ | ✅ 通过 | 未验证 |
+| 书架列表 / 网格切换 + 删除 | ✅ | ✅ 通过 | 未验证 |
+| 最近阅读（按 `lastOpenedAt` 排序） | ✅ | ✅ 通过 | 未验证 |
+| 打开书籍 → 正文渲染 | ❌ 占位页 | ✅ 通过 | 未验证 |
+| 目录 / 跳转 / 进度恢复 | 未开始（`ReaderEngine` 接口已定稿） | — | 未验证 |
 | 性能目标（冷启动 <2s、大文件不 ANR） | 未开始 | — | **未测量** |
 
-已实测（2026-10-25）：`assembleDebug` 产出 11.6 MB debug APK；13 个单元测试全通过；`lintDebug` 无阻断；APK 内**无 `INTERNET` 权限、无存储权限**。完整命令与原始输出见 [docs/build-verification.md](docs/build-verification.md)，工具链细节见 [docs/environment.md](docs/environment.md)。
+已实测（2026-10-25）：`assembleDebug` 产出 **11.98 MB** debug APK；**37 个单元测试全通过**；`lintDebug` **0 errors / 4 warnings**（3 条是 Kotlin 版本已知取舍，1 条是 adaptive icon 目录的误报）；APK `minSdkVersion 26`、`targetSdkVersion 37`、**无 `INTERNET` 权限、无存储权限**。完整命令与原始输出见 [docs/build-verification.md](docs/build-verification.md)，分层与线程模型见 [docs/architecture.md](docs/architecture.md)，工具链细节见 [docs/environment.md](docs/environment.md)。
 
-尚未验证：真机/模拟器上的导入、打开、跳转、进度恢复（本机无设备），release 混淆构建，性能门禁。
+尚未验证：导入 / 打开 / 跳转 / 进度恢复的设备端行为（本机模拟器无法启动，详见 docs/build-verification.md）、release 混淆构建、性能门禁。
+
+> **借用别人的机器验证时**：`./gradlew :app:assembleDebug` 后把 `app-debug.apk` 装到 Android 8.0+ 设备，走一遍「导入 → 书架 → 删除」，再把 Logcat 里 `PlainPage` 标签的内容贴到 Issue。
 
 ---
 
@@ -84,15 +90,16 @@ Repository（Room 存书目与进度，DataStore 存外观设置，文件在私�
 git clone https://github.com/galizhajidanbaofan/plainpage-reader.git
 cd plainpage-reader
 ./gradlew :app:assembleDebug        # 构建 debug APK
-./gradlew :app:testDebugUnitTest    # 单元测试
+./gradlew :app:testDebugUnitTest    # 单元测试（37 个）
 ./gradlew :app:lintDebug            # Lint
 ```
 
 产物：`app/build/outputs/apk/debug/app-debug.apk`。
 
 - 版本号一律以 [`gradle/libs.versions.toml`](gradle/libs.versions.toml) 为准，不在文档里写死。
+- **Kotlin 固定 2.3.20，别随手升 2.4.x**：KSP 最新版 `2.3.12` 只针对 Kotlin 2.3.20 构建，升 Kotlin 会让 `:app:kspDebugKotlin` 以 `ExceptionInInitializerError` 失败（Room 依赖 KSP）。
 - 若 `ANDROID_HOME` 未设置，在项目根目录建 `local.properties` 写 `sdk.dir=<你的 SDK 路径>`（该文件已被 git 忽略）。
-- 常见坑（AGP 9 内置 Kotlin、platform 37 目录名、build-tools 36.0.0 等）与本机实测输出见 [docs/build-verification.md](docs/build-verification.md)。
+- 常见坑（AGP 9 内置 Kotlin、platform 37 目录名、build-tools 36.0.0、KDoc 里写 `*/` 会把注释提前闭合等）与本机实测输出见 [docs/build-verification.md](docs/build-verification.md)。
 
 ---
 

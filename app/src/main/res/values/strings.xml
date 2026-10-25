@@ -7,8 +7,32 @@
 
     <string name="shelf_empty_title">书架还空着</string>
     <string name="shelf_empty_hint">支持 EPUB / TXT / PDF，导入后复制到应用私有目录，原文件不会被改动。</string>
+    <string name="shelf_import">导入</string>
+    <string name="shelf_importing">导入中…</string>
+    <string name="shelf_meta">%1$s · %2$s · %3$s</string>
+    <string name="shelf_delete_title">移出书架</string>
+    <string name="shelf_delete_message">确定把《%1$s》移出书架吗？应用私有目录里的副本会一并删除，你原来的文件不受影响。</string>
+
     <string name="recent_empty_title">还没有阅读记录</string>
     <string name="recent_empty_hint">打开过的书会按最近阅读时间排在这里。</string>
+
+    <string name="action_delete">删除</string>
+    <string name="action_cancel">取消</string>
+    <string name="action_back">返回书架</string>
+
+    <string name="import_done">已导入 %1$d 本</string>
+    <string name="import_failed">导入失败：%1$s</string>
+    <string name="import_reason_unavailable">读不到源文件，权限可能已失效</string>
+    <string name="import_reason_unsupported">不支持的文件类型</string>
+    <string name="import_reason_too_large">文件超过 300 MB</string>
+    <string name="import_reason_empty">文件是空的</string>
+    <string name="import_reason_io">写入私有目录失败</string>
+
+    <string name="reader_missing">这本书已经不在书架上了</string>
+    <string name="reader_book_meta">%1$s · %2$s</string>
+    <string name="reader_placeholder">阅读引擎（EPUB / TXT / PDF 渲染）将在下一阶段接入。本页目前只验证「打开 → 记录最近阅读 → 显示上次进度」这条链路。</string>
+    <string name="reader_progress_known">上次进度：%1$s</string>
+    <string name="reader_progress_none">还没有阅读进度</string>
 
     <string name="settings_appearance">外观</string>
     <string name="settings_reading_theme">阅读主题</string>

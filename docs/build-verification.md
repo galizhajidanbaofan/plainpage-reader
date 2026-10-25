@@ -64,3 +64,70 @@ uses-permission: name='io.github.galizhajidanbaofan.plainpage.DYNAMIC_RECEIVER_N
 - 性能门禁（冷启动 <2s、10MB EPUB / 100MB TXT / 50MB PDF 不 ANR）：**未测量**。
 - `assembleRelease`（R8/混淆）与签名：**未跑**，`proguard-rules.pro` 目前是空的占位。
 - 仪器测试：仓库内**还没有** `androidTest`。
+
+---
+
+# 第二轮实测（阶段 2：书架 + 导入 + 最近阅读，2026-10-25）
+
+## 1. 命令与结果
+
+```bash
+# 环境（本机工具链都在工作区 .toolchain 下，换成你自己的即可）
+export JAVA_HOME=<workspace>/.toolchain/jdk21
+export ANDROID_HOME=<workspace>/.toolchain
+export ANDROID_USER_HOME=$ANDROID_HOME/android-home
+export GRADLE_USER_HOME=$ANDROID_HOME/gradle-home
+export JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=<workspace>/.toolchain/tmp
+
+$ANDROID_HOME/gradle-dist/bin/gradle.bat :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+```
+
+结果：
+
+```
+BUILD SUCCESSFUL in 41s
+53 actionable tasks: 11 executed, 7 from cache, 35 up-to-date
+```
+
+- 单元测试 **37 个全通过**（`tests=37 failures=0 errors=0`）：`BookEntityTest` 5、`BookFormatTest` 3、`DisplayFormatsTest` 11、`ImportRulesTest` 8、`ReadingLocationCodecTest` 5、`ThemeTokensTest` 5。
+- `lintDebug`：**0 errors, 4 warnings**。其中 3 条是 `NewerVersionAvailable`（Kotlin 2.3.20 vs 2.4.21），属**已知取舍**（KSP 现版本只支持 Kotlin 2.3.20）；1 条 `ObsoleteSdkInt` 指向 `mipmap-anydpi-v26`，实际是**误报**——把 adaptive icon 移到 `mipmap-anydpi` 后 AAPT 链接阶段直接报 `resource mipmap/ic_launcher not found`（adaptive icon 必须留在 `-v26` 目录），已改回。
+- 产物：`app/build/outputs/apk/debug/app-debug.apk`，**11,982,156 字节（11.42 MiB）**。
+- APK badging：`minSdkVersion:'26'`、`targetSdkVersion:'37'`、`application-label:'简页'`、无 `INTERNET`。
+
+## 2. 本轮新增的坑
+
+| 现象 | 根因 | 处理 |
+|---|---|---|
+| `since the JVM garbage collector is thrashing` → 守护进程被杀 | 默认堆在低内存机器上被反复 GC | `gradle.properties` 显式 `-Xmx3g -XX:MaxMetaspaceSize=1g` + Kotlin daemon `-Xmx2g` |
+| `Could not resolve kotlin-stdlib:2.3.20` + 连接 `dl.google.com` 超时 | `dependencyResolutionManagement` 里 `google()` 在 `mavenCentral()` 前，纯 Central 构件也先去问 Google 镜像 | 把 `mavenCentral()` 提到 `google()` 前面（`settings.gradle.kts`），并在文件里写了注释说明原因 |
+| `e: [ksp] java.lang.ExceptionInInitializerError` | Kotlin 2.4.10 + KSP 2.3.12（KSP 无 2.4.x 版本，2.3.12 面向 Kotlin 2.3.20 构建） | Kotlin 降到 **2.3.20**（`kotlin` / `kotlinTest` 两处），compose 插件同步跟随 |
+| `AccessDeniedException: ...\Temp\global_synthetics_intermediate...`（设了 `TEMP` 仍然复现） | AAPT2 走 JVM 的 `java.io.tmpdir`，不读 `TEMP` | `JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=<workspace>/.toolchain/tmp`（对所有 worker JVM 生效） |
+| `BookImporter.kt:167 Syntax error: Expecting a top level declaration` ×30 | KDoc 里写了 `` `*/*` ``，其中的 `*/` **提前闭合了注释块** | 改写措辞（不出现 `*/`）。教训：注释里任何 `*/` 都是雷 |
+| `Android resource linking failed: resource mipmap/ic_launcher not found` | 见上文 `ObsoleteSdkInt` 误报 | 把 `mipmap-anydpi` 改回 `mipmap-anydpi-v26` |
+| `RedundantLabel` lint 警告 | Activity 的 `android:label` 与 Application 重复 | 删掉 Activity 上的 `android:label` |
+
+## 3. 模拟器预览：本机不可用（已尝试并判定）
+
+目标是用 AVD 跑起来截图给用户看。**结论：本机起不来，已如实放弃，不是没试。**
+
+做到哪一步：
+
+- `sdkmanager` 装好 `emulator`（37.2.12）与 `system-images;android-36;google_apis;x86_64`（4.3 GB，含 `system.img` / `vendor.img`）。
+- `avdmanager create avd -n plainpage -d pixel_6` 成功（提示 `Could not load devices from ...devices.xml` 但 AVD 已生成，设备配置走默认）。
+- `emulator` 能识别 `WHPX ... accelerator is operational`，进程能起来。
+
+卡在哪：
+
+| 尝试 | 结果 |
+|---|---|
+| 默认 `-gpu swiftshader_indirect` | emulator 进程 exit 1，日志只有 `FATAL \| Running multiple emulators with the same AVD...`（上一次被杀留下的 AVD 锁） |
+| 清掉 AVD 锁 / 单实例重跑 | 进入 boot，但 adb 一直 `offline`；qemu 进程 CPU 时间 8 分钟只涨到 1.3 s（`Get-Process` 实测），说明**guest 根本没在跑指令** |
+| `-no-window` `-gpu off` `-gpu swiftshader_indirect` `-feature -Netsim` `-read-only` + 全新 `userdata-qemu.img` | 全部同样卡在 `adb offline`；`netsim` 那条报 `called Result::unwrap() on an Err value: Os { code: 5, kind: PermissionDenied }`（`external/netsim+/next/common/src/system/mod.rs:17`） |
+
+判断：该机器上的 qemu 拿不到可用的虚拟化执行环境（WHPX 报告可用但 guest 不执行），属**环境限制**，不是项目代码问题。要预览成果，需要一台真机或另一台能跑 AVD 的机器。
+
+## 4. 仍未验证
+
+- 导入 / 书架 / 删除 / 最近阅读的**设备端**实际行为（单测只覆盖纯逻辑与实体映射）。
+- 阅读页目前是占位页，"打开书籍"只到占位页为止，正文渲染尚未实现。
+- 性能门禁、release 构建、仪器测试：同前一轮，全部未做。
