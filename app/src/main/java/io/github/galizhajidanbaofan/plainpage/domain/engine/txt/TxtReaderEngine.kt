@@ -2,7 +2,7 @@ package io.github.galizhajidanbaofan.plainpage.domain.engine.txt
 
 import io.github.galizhajidanbaofan.plainpage.domain.engine.BookMetadata
 import io.github.galizhajidanbaofan.plainpage.domain.engine.OutlineItem
-import io.github.galizhajidanbaofan.plainpage.domain.engine.ReaderEngine
+import io.github.galizhajidanbaofan.plainpage.domain.engine.PaginatedEngine
 import io.github.galizhajidanbaofan.plainpage.domain.engine.ReaderException
 import io.github.galizhajidanbaofan.plainpage.domain.model.Book
 import io.github.galizhajidanbaofan.plainpage.domain.model.ReadingLocation
@@ -25,19 +25,19 @@ import java.io.FileNotFoundException
 class TxtReaderEngine(
     private val indexer: TxtBookIndexer = TxtBookIndexer(),
     private val progressSink: (suspend (ReadingLocation, Float) -> Unit)? = null,
-) : ReaderEngine {
+) : PaginatedEngine {
 
     private var book: Book? = null
     private var index: TxtIndex? = null
     private var reader: TxtPageReader? = null
 
     /** 全文长度（字符数）；未打开时为 0。 */
-    val charCount: Int get() = index?.charCount ?: 0
+    override val charCount: Int get() = index?.charCount ?: 0
 
     val encoding: TextEncoding? get() = index?.encoding
 
     /** 解码过程中出现过替换字符，UI 应提示"编码可能不准"。 */
-    val lossyDecoding: Boolean get() = index?.lossyDecoding == true
+    override val lossyDecoding: Boolean get() = index?.lossyDecoding == true
 
     val chaptersTruncated: Boolean get() = index?.chaptersTruncated == true
 
@@ -95,13 +95,13 @@ class TxtReaderEngine(
     }
 
     /** 取一页正文；越界由 [TxtPageReader] 夹紧。 */
-    suspend fun read(startChar: Int, count: Int): String {
+    override suspend fun readText(startChar: Int, count: Int): String {
         val active = reader ?: return ""
         return withContext(Dispatchers.IO) { active.read(startChar, count) }
     }
 
     /** 由字符偏移反推出可保存的位置（章节索引 + 百分比）。 */
-    fun positionOf(charOffset: Int): ReadingLocation.Txt? {
+    override fun positionOf(charOffset: Int): ReadingLocation? {
         val current = index ?: return null
         if (current.charCount == 0) return null
         val offset = charOffset.coerceIn(0, current.charCount - 1)

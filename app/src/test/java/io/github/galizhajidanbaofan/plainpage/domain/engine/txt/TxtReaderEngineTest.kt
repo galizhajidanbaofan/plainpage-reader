@@ -144,14 +144,14 @@ class TxtReaderEngineTest {
         assertEquals(30, restored.chapterIndex)
         assertEquals(1f, restored.fraction, 0.0001f)
 
-        val position = engine.positionOf(novel.length / 2)
+        val position = engine.positionOf(novel.length / 2) as ReadingLocation.Txt?
         assertNotNull(position)
         engine.saveProgress(position!!, position.fraction)
         assertEquals(1, saved.size)
         assertEquals(position, saved.single().first)
 
         engine.close()
-        assertEquals("", engine.read(0, 10))
+        assertEquals("", engine.readText(0, 10))
     }
 
     @Test

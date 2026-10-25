@@ -89,9 +89,9 @@ BUILD SUCCESSFUL in 41s
 53 actionable tasks: 11 executed, 7 from cache, 35 up-to-date
 ```
 
-- 单元测试 **37 个全通过**（`tests=37 failures=0 errors=0`）：`BookEntityTest` 5、`BookFormatTest` 3、`DisplayFormatsTest` 11、`ImportRulesTest` 8、`ReadingLocationCodecTest` 5、`ThemeTokensTest` 5。
+- 单元测试 **78 个全通过**（`tests=78 failures=0 errors=0`）：`DisplayFormatsTest` 11、`TextEncodingDetectorTest` 8、`TxtChapterScannerTest` 8、`ImportRulesTest` 8、`TxtReaderEngineTest` 7、`ReaderPagerTest` 7、`BookEntityTest` 5、`ReadingLocationCodecTest` 5、`ShelfScreenshotTest` 5、`ThemeTokensTest` 5、`ReaderScreenshotTest` 4、`BookFormatTest` 3、`TxtReadingLoopTest` 2。
 - `lintDebug`：**0 errors, 4 warnings**。其中 3 条是 `NewerVersionAvailable`（Kotlin 2.3.20 vs 2.4.21），属**已知取舍**（KSP 现版本只支持 Kotlin 2.3.20）；1 条 `ObsoleteSdkInt` 指向 `mipmap-anydpi-v26`，实际是**误报**——把 adaptive icon 移到 `mipmap-anydpi` 后 AAPT 链接阶段直接报 `resource mipmap/ic_launcher not found`（adaptive icon 必须留在 `-v26` 目录），已改回。
-- 产物：`app/build/outputs/apk/debug/app-debug.apk`，**11,982,156 字节（11.42 MiB）**。
+- 产物：`app/build/outputs/apk/debug/app-debug.apk`，**12,087,959 字节（11.53 MiB）**——比上一版多的部分就是 TXT 引擎与阅读页。
 - APK badging：`minSdkVersion:'26'`、`targetSdkVersion:'37'`、`application-label:'简页'`、无 `INTERNET`。
 
 ## 2. 本轮新增的坑
@@ -105,6 +105,8 @@ BUILD SUCCESSFUL in 41s
 | `BookImporter.kt:167 Syntax error: Expecting a top level declaration` ×30 | KDoc 里写了 `` `*/*` ``，其中的 `*/` **提前闭合了注释块** | 改写措辞（不出现 `*/`）。教训：注释里任何 `*/` 都是雷 |
 | `Android resource linking failed: resource mipmap/ic_launcher not found` | 见上文 `ObsoleteSdkInt` 误报 | 把 `mipmap-anydpi` 改回 `mipmap-anydpi-v26` |
 | `RedundantLabel` lint 警告 | Activity 的 `android:label` 与 Application 重复 | 删掉 Activity 上的 `android:label` |
+| `EmptySuperCall` lint 警告 | `ViewModel.onCleared()` 里调了空的 `super.onCleared()` | 直接删掉这行 |
+| `UnusedResources`（`R.string.reader_missing`） | 阅读页占位文案被真实阅读页替换后，字符串没人引用 | 删掉该字符串（占位页的 `reader_*` 文案一并清理） |
 
 ## 3. 模拟器预览：本机不可用（已尝试并判定）
 

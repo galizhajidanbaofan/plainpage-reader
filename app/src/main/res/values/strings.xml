@@ -28,11 +28,19 @@
     <string name="import_reason_empty">文件是空的</string>
     <string name="import_reason_io">写入私有目录失败</string>
 
-    <string name="reader_missing">这本书已经不在书架上了</string>
-    <string name="reader_book_meta">%1$s · %2$s</string>
-    <string name="reader_placeholder">阅读引擎（EPUB / TXT / PDF 渲染）将在下一阶段接入。本页目前只验证「打开 → 记录最近阅读 → 显示上次进度」这条链路。</string>
-    <string name="reader_progress_known">上次进度：%1$s</string>
-    <string name="reader_progress_none">还没有阅读进度</string>
+    <string name="reader_toc">目录</string>
+    <string name="reader_toc_page">第 %1$d 页</string>
+    <string name="reader_prev_page">上一页</string>
+    <string name="reader_next_page">下一页</string>
+    <string name="reader_page_progress">%1$d / %2$d · %3$d%%</string>
+    <string name="reader_lossy">编码可能识别有误，正文里出现了无法识别的字符</string>
+    <string name="reader_unsupported">%1$s 阅读引擎还没接入，当前只支持 TXT</string>
+    <string name="reader_error_missing">文件不在了：可能被系统清理，或读取权限已失效</string>
+    <string name="reader_error_corrupted">文件损坏或格式不对，打不开</string>
+    <string name="reader_error_encoding">编码识别失败，无法解析正文</string>
+    <string name="reader_error_empty">这本书没有可显示的正文</string>
+    <string name="reader_error_too_large">文件太大，暂时打不开</string>
+    <string name="reader_error_unknown">打开失败：未知错误</string>
 
     <string name="settings_appearance">外观</string>
     <string name="settings_reading_theme">阅读主题</string>

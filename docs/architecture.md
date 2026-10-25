@@ -60,6 +60,26 @@ di/                      AppContainer：手写组合根（不引 Hilt/Koin）
 | `EpubReaderEngine` | 自研最小 EPUB2/3（ZIP + `container.xml` → OPF spine → NCX/nav 目录） | href + 章节内百分比 |
 | `PdfReaderEngine` | 平台 `PdfRenderer` 渲染位图 | 页码 + 页内滚动比例 |
 
+### 阅读页的数据流（当前已接入 TXT）
+
+```
+Room(book 行) ──find()──▶ ReaderViewModel ──engineFactory──▶ TxtReaderEngine
+                              │                                 │
+                              │◀── loadOutline() / restoreProgress()
+                              │
+        ReaderPager(charCount) 把「字符偏移」换算成页码/百分比
+                              │
+                              ▼
+                     ReaderUiState.Ready ──▶ ReaderContent（纯展示）
+```
+
+- **翻页不重开文件**：`TxtPageReader` 用随机访问的缓冲读，一次只取 `ReaderPager.DEFAULT_WINDOW_CHARS = 1200` 个字符。
+- **进度写回由引擎外抛**：引擎不认识 Room，构造时注入 `progressSink`，组合根把它接到 `BookRepository.saveLocation`。
+- **恢复进度先对齐页首**：`ReaderPager.clampToPage(charOffset)` 保证「存下的偏移」和「重开后的窗口起点」是同一个，字体大小变了也不会错位到半句话。
+- **UI 只吃状态**：`ReaderContent` 不碰文件、不碰数据库，所以截图测试可以直接喂假状态。
+
+为什么用「固定字符窗口」而不是「按屏幕高度分页」：前者与字体、字号、屏幕密度无关，同一份进度在任何设备上都能恢复到同一段文字；后者必须排版完成才知道一页多少字，进度会跟着设备变。
+
 ## 为什么不引这些依赖
 
 | 依赖 | 结论 | 原因 |

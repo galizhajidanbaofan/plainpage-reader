@@ -31,6 +31,7 @@ import androidx.navigation.navArgument
 import io.github.galizhajidanbaofan.plainpage.PlainPageApplication
 import io.github.galizhajidanbaofan.plainpage.R
 import io.github.galizhajidanbaofan.plainpage.data.importing.ImportRejection
+import io.github.galizhajidanbaofan.plainpage.di.AppContainer
 import io.github.galizhajidanbaofan.plainpage.domain.model.Book
 import io.github.galizhajidanbaofan.plainpage.ui.library.LibraryMessage
 import io.github.galizhajidanbaofan.plainpage.ui.library.LibraryViewModel
@@ -99,6 +100,7 @@ fun PlainPageApp() {
             ) { innerPadding ->
                 PlainPageNavHost(
                     navController = navController,
+                    container = container,
                     appearance = appearance,
                     onAppearanceChange = { appearance = it },
                     libraryViewModel = libraryViewModel,
@@ -155,6 +157,7 @@ private fun PlainPageBottomBar(navController: NavHostController, currentRoute: S
 @Composable
 private fun PlainPageNavHost(
     navController: NavHostController,
+    container: AppContainer,
     appearance: AppearanceState,
     onAppearanceChange: (AppearanceState) -> Unit,
     libraryViewModel: LibraryViewModel,
@@ -199,7 +202,7 @@ private fun PlainPageNavHost(
             val bookId = entry.arguments?.getLong(ARG_BOOK_ID) ?: return@composable
             ReaderScreen(
                 bookId = bookId,
-                viewModel = libraryViewModel,
+                container = container,
                 onBack = { navController.popBackStack() },
             )
         }

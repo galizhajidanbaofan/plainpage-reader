@@ -5,6 +5,10 @@ import io.github.galizhajidanbaofan.plainpage.data.importing.BookImporter
 import io.github.galizhajidanbaofan.plainpage.data.importing.booksDirectory
 import io.github.galizhajidanbaofan.plainpage.data.local.PlainPageDatabase
 import io.github.galizhajidanbaofan.plainpage.data.repository.RoomBookRepository
+import io.github.galizhajidanbaofan.plainpage.domain.engine.ReaderEngine
+import io.github.galizhajidanbaofan.plainpage.domain.engine.txt.TxtReaderEngine
+import io.github.galizhajidanbaofan.plainpage.domain.model.Book
+import io.github.galizhajidanbaofan.plainpage.domain.model.BookFormat
 import io.github.galizhajidanbaofan.plainpage.domain.repository.BookRepository
 
 /**
@@ -20,6 +24,19 @@ class AppContainer(context: Context) {
     private val database: PlainPageDatabase by lazy { PlainPageDatabase.build(appContext) }
 
     val bookRepository: BookRepository by lazy { RoomBookRepository(database.bookDao()) }
+
+    /**
+     * 按格式造引擎。还没有实现的格式返回 null，由 UI 显示「还没接入」而不是假装打开成功。
+     *
+     * 进度写回在这里注入：引擎不认识 Room，只把位置交给这个 lambda。
+     */
+    fun createEngine(book: Book): ReaderEngine? = when (book.format) {
+        BookFormat.TXT -> TxtReaderEngine(
+            progressSink = { location, _ -> bookRepository.saveLocation(book.id, location) },
+        )
+        // TODO(阶段 3)：EPUB 自研解析、PDF 用 Android PdfRenderer。
+        BookFormat.EPUB, BookFormat.PDF -> null
+    }
 
     val bookImporter: BookImporter by lazy {
         BookImporter(

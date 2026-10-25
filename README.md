@@ -17,7 +17,7 @@
 
 ## 状态（务必先读）
 
-**当前：构建通过、书架与导入代码已落地并有单测覆盖，但三种格式的解析引擎还没写，阅读页是占位页。** 也就是说——APK 装上去能看到书架、能选文件导入，点进去还看不到正文。下表是诚实进度。
+**当前：构建通过、书架/导入/最近阅读已落地，TXT 已能真的读——分章目录、按窗口翻页、进度写回与恢复都在代码里跑通并有单测。EPUB 与 PDF 的引擎还没写，点进去会明确显示「引擎还没接入」而不是假装打开。** 下表是诚实进度。
 
 | 能力 | 代码 | 构建 | 真机验收 |
 |---|---|---|---|
@@ -28,11 +28,13 @@
 | SAF 导入（复制到私有目录、300 MB 上限、流式写入、来源记录） | ✅ | ✅ 通过 | 未验证 |
 | 书架列表 / 网格切换 + 删除 | ✅ | ✅ 通过 | 未验证 |
 | 最近阅读（按 `lastOpenedAt` 排序） | ✅ | ✅ 通过 | 未验证 |
-| 打开书籍 → 正文渲染 | ❌ 占位页 | ✅ 通过 | 未验证 |
-| 目录 / 跳转 / 进度恢复 | 未开始（`ReaderEngine` 接口已定稿） | — | 未验证 |
+| 打开 TXT → 正文渲染 + 翻页 | ✅ | ✅ 通过 | 未验证 |
+| TXT 目录 / 跳章 / 进度恢复 | ✅ | ✅ 通过（含闭环单测） | 未验证 |
+| EPUB 打开 / 目录 / 进度 | 未开始 | — | 未验证 |
+| PDF 打开 / 页码跳转 | 未开始 | — | 未验证 |
 | 性能目标（冷启动 <2s、大文件不 ANR） | 未开始 | — | **未测量** |
 
-已实测（2026-10-25）：`assembleDebug` 产出 **11.98 MB** debug APK；**37 个单元测试全通过**；`lintDebug` **0 errors / 4 warnings**（3 条是 Kotlin 版本已知取舍，1 条是 adaptive icon 目录的误报）；APK `minSdkVersion 26`、`targetSdkVersion 37`、**无 `INTERNET` 权限、无存储权限**。完整命令与原始输出见 [docs/build-verification.md](docs/build-verification.md)，分层与线程模型见 [docs/architecture.md](docs/architecture.md)，工具链细节见 [docs/environment.md](docs/environment.md)。
+已实测（2026-10-25）：`assembleDebug` 产出 **12.09 MB** debug APK；**78 个单元测试全通过**（含 8 张离屏截图、TXT「存进度→重开→同一屏」闭环）；`lintDebug` **0 errors / 4 warnings**（3 条是 Kotlin 版本已知取舍，1 条是 AAPT 要求 adaptive icon 放 `-v26` 目录导致的误报）；APK `minSdkVersion 26`、`targetSdkVersion 37`、**无 `INTERNET` 权限、无存储权限**。完整命令与原始输出见 [docs/build-verification.md](docs/build-verification.md)，分层与线程模型见 [docs/architecture.md](docs/architecture.md)，工具链细节见 [docs/environment.md](docs/environment.md)。
 
 尚未验证：导入 / 打开 / 跳转 / 进度恢复的设备端行为（本机模拟器无法启动，详见 docs/build-verification.md）、release 混淆构建、性能门禁。
 
@@ -42,15 +44,19 @@
 
 ## 界面实拍（不是效果图）
 
-本机跑不起 Android 模拟器（宿主虚拟化与图形都不满足，详见 [docs/preview-device.md](docs/preview-device.md)），所以用 Robolectric 的原生图形把 Compose 界面**真的画成 PNG**：`./gradlew :app:testDebugUnitTest --tests "*ShelfScreenshotTest*"`，产物在 `app/build/screenshots/`，仓库里同步了一份。
+本机跑不起 Android 模拟器（宿主虚拟化与图形都不满足，详见 [docs/preview-device.md](docs/preview-device.md)），所以用 Robolectric 的原生图形把 Compose 界面**真的画成 PNG**：`./gradlew :app:testDebugUnitTest --tests "*ScreenshotTest*"`，产物在 `app/build/screenshots/`，仓库里同步了一份。
 
 | 书架 · 列表（浅色） | 书架 · 网格（浅色） | 书架 · 列表（深色） | 书架 · 网格（护眼） |
 |---|---|---|---|
 | ![](docs/screenshots/01-shelf-list-light.png) | ![](docs/screenshots/02-shelf-grid-light.png) | ![](docs/screenshots/03-shelf-list-dark.png) | ![](docs/screenshots/04-shelf-grid-sepia.png) |
 
+| 阅读 · 浅色 | 阅读 · 护眼 | 阅读 · 深色 | 引擎未接入 |
+|---|---|---|---|
+| ![](docs/screenshots/06-reader-light.png) | ![](docs/screenshots/07-reader-sepia.png) | ![](docs/screenshots/08-reader-dark.png) | ![](docs/screenshots/09-reader-unsupported.png) |
+
 空书架状态：[docs/screenshots/05-shelf-empty.png](docs/screenshots/05-shelf-empty.png)
 
-这些图验证的是**渲染与布局**（列表/网格结构、三种配色、超长书名省略、最近阅读时间格式）。点击、返回键、SAF 选择器、Room 落库等行为仍必须上设备验证——截图通过 ≠ 功能通过。
+这些图验证的是**渲染与布局**（列表/网格结构、三种配色、超长书名省略、最近阅读时间格式、正文行距与翻页条）。点击、返回键、SAF 选择器、Room 落库等行为仍必须上设备验证——截图通过 ≠ 功能通过。
 
 ---
 
@@ -104,7 +110,7 @@ Repository（Room 存书目与进度，DataStore 存外观设置，文件在私�
 git clone https://github.com/galizhajidanbaofan/plainpage-reader.git
 cd plainpage-reader
 ./gradlew :app:assembleDebug        # 构建 debug APK
-./gradlew :app:testDebugUnitTest    # 单元测试（37 个）
+./gradlew :app:testDebugUnitTest    # 单元测试（78 个，含 8 张截图）
 ./gradlew :app:lintDebug            # Lint
 ```
 
