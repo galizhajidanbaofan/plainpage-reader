@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">简页</string>
+    <string name="nav_shelf">书架</string>
+    <string name="nav_recent">最近</string>
+    <string name="nav_settings">设置</string>
+
+    <string name="shelf_empty_title">书架还空着</string>
+    <string name="shelf_empty_hint">支持 EPUB / TXT / PDF，导入后复制到应用私有目录，原文件不会被改动。</string>
+    <string name="recent_empty_title">还没有阅读记录</string>
+    <string name="recent_empty_hint">打开过的书会按最近阅读时间排在这里。</string>
+
+    <string name="settings_appearance">外观</string>
+    <string name="settings_reading_theme">阅读主题</string>
+    <string name="settings_shelf_layout">书架布局</string>
+    <string name="settings_reading_mode">翻页方式</string>
+
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="theme_sepia">护眼</string>
+    <string name="layout_list">列表</string>
+    <string name="layout_grid">网格</string>
+    <string name="mode_paged">翻页</string>
+    <string name="mode_scroll">滚动</string>
+</resources>

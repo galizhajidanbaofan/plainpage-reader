@@ -17,18 +17,20 @@
 
 ## 状态（务必先读）
 
-**本项目处于阶段 0 / 阶段 1 之间：仓库骨架已建立，应用代码尚未落地，从未构建过。**
-下表是诚实的进度记录，任何一格写 `未验证` 就意味着——不要相信它。
+**当前：构建体系已打通并实测通过，应用功能代码尚未开始。**「能构建出空壳 APK」≠「阅读器能用」，下表是诚实的进度记录。
 
 | 能力 | 代码 | 构建 | 真机验收 |
 |---|---|---|---|
-| 仓库骨架 / 许可证 / 文档 | 已有 | — | — |
-| 构建体系（Gradle / AGP / 版本目录） | 未开始 | 未验证 | — |
-| 书架 / 导入 / 三格式打开 | 未开始 | 未验证 | 未验证 |
-| 进度记忆 / 目录跳转 | 未开始 | 未验证 | 未验证 |
-| 性能目标（冷启动 <2s、大文件不 ANR） | 未开始 | — | 未测量 |
+| 仓库骨架 / 许可证 / 文档 | ✅ | — | — |
+| 构建体系（Gradle 9.8.2 / AGP 9.4.1 / Kotlin 2.4.10 / compileSdk 37） | ✅ | ✅ 通过 | — |
+| 外观注入骨架（AppearanceRepository / ThemeTokens / 13 个单测） | ✅ | ✅ 通过 | 未验证 |
+| 书架 / 导入 / 三格式打开 | 未开始 | — | 未验证 |
+| 进度记忆 / 目录跳转 | 未开始 | — | 未验证 |
+| 性能目标（冷启动 <2s、大文件不 ANR） | 未开始 | — | **未测量** |
 
-当前阻塞：构建机缺 JDK / Android SDK / adb，导致「构建通过」「不 ANR」这类门禁**无法在本机验证**。详见 [docs/environment.md](docs/environment.md)（建设中）。
+已实测（2026-10-25）：`assembleDebug` 产出 11.6 MB debug APK；13 个单元测试全通过；`lintDebug` 无阻断；APK 内**无 `INTERNET` 权限、无存储权限**。完整命令与原始输出见 [docs/build-verification.md](docs/build-verification.md)，工具链细节见 [docs/environment.md](docs/environment.md)。
+
+尚未验证：真机/模拟器上的导入、打开、跳转、进度恢复（本机无设备），release 混淆构建，性能门禁。
 
 ---
 
@@ -76,17 +78,21 @@ Repository（Room 存书目与进度，DataStore 存外观设置，文件在私�
 
 ## 构建
 
-依赖 JDK 17+、Android SDK（platform + build-tools）、Gradle wrapper。
+需要：**JDK 17+**（实测 JDK 21）、Android SDK Platform `android-37.0`、Build-Tools `36.0.0`。Gradle 由仓库内 wrapper 提供（9.8.2），无需预装。
 
 ```bash
 git clone https://github.com/galizhajidanbaofan/plainpage-reader.git
 cd plainpage-reader
-./gradlew :app:assembleDebug        # 构建
+./gradlew :app:assembleDebug        # 构建 debug APK
 ./gradlew :app:testDebugUnitTest    # 单元测试
 ./gradlew :app:lintDebug            # Lint
 ```
 
-> 说明：构建脚本尚未落地（阶段 1 交付），以上命令是预期形态，目前执行会失败。版本号一律以 `gradle/libs.versions.toml` 为准，不在 README 里写死。
+产物：`app/build/outputs/apk/debug/app-debug.apk`。
+
+- 版本号一律以 [`gradle/libs.versions.toml`](gradle/libs.versions.toml) 为准，不在文档里写死。
+- 若 `ANDROID_HOME` 未设置，在项目根目录建 `local.properties` 写 `sdk.dir=<你的 SDK 路径>`（该文件已被 git 忽略）。
+- 常见坑（AGP 9 内置 Kotlin、platform 37 目录名、build-tools 36.0.0 等）与本机实测输出见 [docs/build-verification.md](docs/build-verification.md)。
 
 ---
 
