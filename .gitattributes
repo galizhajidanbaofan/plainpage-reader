@@ -1,0 +1,27 @@
+* text=auto eol=lf
+
+*.kt   text eol=lf
+*.kts  text eol=lf
+*.java text eol=lf
+*.md   text eol=lf
+*.xml  text eol=lf
+*.toml text eol=lf
+*.pro  text eol=lf
+*.properties text eol=lf
+LICENSE   text eol=lf
+NOTICE    text eol=lf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+gradlew text eol=lf
+
+*.jar  binary
+*.png  binary
+*.jpg  binary
+*.webp binary
+*.ttf  binary
+*.otf  binary
+*.epub binary
+
+# Keep these out of GitHub linguist statistics noise
+THIRD-PARTY-NOTICES.md linguist-documentation
+docs/* linguist-documentation
