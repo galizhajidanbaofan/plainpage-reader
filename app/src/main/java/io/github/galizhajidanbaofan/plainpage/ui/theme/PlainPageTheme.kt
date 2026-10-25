@@ -31,6 +31,12 @@ fun PlainPageTheme(
             onSurfaceVariant = tokens.textSecondary,
             outline = tokens.textSecondary,
             outlineVariant = tokens.divider,
+            // 容器色也跟随阅读主题：FAB / 选中态原本会退回 Material 默认紫色，
+            // 在绿色强调色的界面里非常刺眼（离屏截图里一眼看出来的）。
+            primaryContainer = tokens.accent,
+            onPrimaryContainer = tokens.paper,
+            secondaryContainer = tokens.surface,
+            onSecondaryContainer = tokens.textPrimary,
         )
     } else {
         lightColorScheme(
@@ -44,6 +50,12 @@ fun PlainPageTheme(
             onSurfaceVariant = tokens.textSecondary,
             outline = tokens.textSecondary,
             outlineVariant = tokens.divider,
+            // 容器色也跟随阅读主题：FAB / 选中态原本会退回 Material 默认紫色，
+            // 在绿色强调色的界面里非常刺眼（离屏截图里一眼看出来的）。
+            primaryContainer = tokens.accent,
+            onPrimaryContainer = tokens.paper,
+            secondaryContainer = tokens.surface,
+            onSecondaryContainer = tokens.textPrimary,
         )
     }
 

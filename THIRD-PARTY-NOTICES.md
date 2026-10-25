@@ -27,6 +27,9 @@
 | Kotlin Stdlib | 由 Kotlin 插件注入（**2.3.20**） | Apache-2.0 | JetBrains 统一许可 | implementation |
 | JUnit 4 | `junit:junit:4.13.2` | **EPL-1.0** | POM 已直接核实 | **testImplementation**（不进 APK） |
 | kotlin-test (JUnit) | `org.jetbrains.kotlin:kotlin-test-junit:2.3.20` | Apache-2.0 | POM 已直接核实 | testImplementation |
+| Robolectric | `org.robolectric:robolectric:4.17` | **MIT** | POM 已直接核实（`The MIT License`，https://robolectric.org） | **testImplementation**（JVM 上跑 Android 资源/图形，不进 APK） |
+| Roborazzi（roborazzi / roborazzi-compose） | `io.github.takahirom.roborazzi:roborazzi:1.77.0`、`roborazzi-compose:1.77.0` | Apache-2.0 | POM 已直接核实 | **testImplementation**（离屏截图，不进 APK） |
+| Compose UI Test（ui-test-junit4 / ui-test-manifest） | 随 Compose BOM `2026.09.00` | Apache-2.0 | Google 官方 androidx 组件 | testImplementation / debugImplementation（不进 release APK） |
 
 > Kotlin 定在 **2.3.20** 而非最新的 2.4.x：KSP 当前最新版 `2.3.12` 是面向 Kotlin 2.3.20 构建的，Maven Central 上不存在 `2.4.x` 版本的 KSP。用 2.4.10 时 `:app:kspDebugKotlin` 直接 `ExceptionInInitializerError`。Room 需要 KSP，所以 Kotlin 跟着 KSP 走；等 KSP 跟进 2.4 再升。`lintDebug` 里 3 条 `NewerVersionAvailable` 警告就是这个已知取舍，**不是遗漏**。
 

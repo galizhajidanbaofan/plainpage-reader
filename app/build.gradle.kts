@@ -57,6 +57,24 @@ android {
         abortOnError = true
         warningsAsErrors = false
     }
+
+    testOptions {
+        // Robolectric 需要真实的资源与 manifest 才能把 Compose 渲染成像素。
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all { test ->
+            // 离屏截图（Roborazzi）默认不写文件，这里固定成「记录」模式。
+            test.systemProperty("roborazzi.test.record", "true")
+            test.systemProperty("roborazzi.test.verify", "false")
+            // Robolectric 默认把 android-all jar 下到用户目录并在那里建锁文件，本机写
+            // C:\Users\<user> 被拦；改成离线模式，jar 预先放进工作区的 .toolchain/robolectric。
+            test.systemProperty("robolectric.offline", "true")
+            test.systemProperty(
+                "robolectric.dependency.dir",
+                "C:/Users/19853/Documents/deepseek-harness/default-workspace/.toolchain/robolectric",
+            )
+            test.maxHeapSize = "2g"
+        }
+    }
 }
 
 kotlin {
@@ -90,7 +108,13 @@ dependencies {
     implementation(libs.androidx.compose.material3)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
     testImplementation(libs.kotlin.test.junit)
 }

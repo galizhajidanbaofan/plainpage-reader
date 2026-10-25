@@ -126,6 +126,26 @@ BUILD SUCCESSFUL in 41s
 
 判断：该机器上的 qemu 拿不到可用的虚拟化执行环境（WHPX 报告可用但 guest 不执行），属**环境限制**，不是项目代码问题。要预览成果，需要一台真机或另一台能跑 AVD 的机器。
 
+## 3.1 替代方案：Robolectric + Roborazzi 离屏截图（已跑通）
+
+模拟器不可用之后改走这条路：在 **JVM** 上用 Robolectric 的原生图形把 Compose 界面画成 PNG，
+不需要 AVD、不需要设备、不需要网络。
+
+- 测试类：`app/src/test/java/io/github/galizhajidanbaofan/plainpage/ui/screenshot/ShelfScreenshotTest.kt`
+- 命令：`./gradlew :app:testDebugUnitTest --tests "*ShelfScreenshotTest*"`
+- 产物：`app/build/screenshots/*.png`（仓库 `docs/screenshots/` 同步一份）
+- 覆盖：书架列表/网格 × 浅色/深色/护眼 + 空书架，共 5 张
+
+两处必须的本机适配（都已写进 `app/build.gradle.kts` 的 `testOptions`）：
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `Couldn't create lock file C:\Users\19853\.robolectric-download-lock`（拒绝访问） | Robolectric 默认往用户主目录下载 android-all jar 并建锁文件，本机禁止写该目录 | 预先下载 `android-all-instrumented-14-robolectric-10818077-i7.jar` 到 `.toolchain/robolectric/`，设 `robolectric.offline=true` + `robolectric.dependency.dir=<该目录>` |
+| `Configuration cache state could not be cached: ... KspAATask` | KSP 9.x 与 Gradle configuration cache 的序列化冲突 | `org.gradle.configuration-cache=false`（换取可重复构建） |
+
+另注：`androidx.test.ext:junit` 当时在 dl.google.com 上解析超时，改用 Robolectric 自带的
+`RobolectricTestRunner` 即可，少一个依赖。
+
 ## 4. 仍未验证
 
 - 导入 / 书架 / 删除 / 最近阅读的**设备端**实际行为（单测只覆盖纯逻辑与实体映射）。

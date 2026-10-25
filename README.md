@@ -40,6 +40,20 @@
 
 ---
 
+## 界面实拍（不是效果图）
+
+本机跑不起 Android 模拟器（宿主虚拟化与图形都不满足，详见 [docs/preview-device.md](docs/preview-device.md)），所以用 Robolectric 的原生图形把 Compose 界面**真的画成 PNG**：`./gradlew :app:testDebugUnitTest --tests "*ShelfScreenshotTest*"`，产物在 `app/build/screenshots/`，仓库里同步了一份。
+
+| 书架 · 列表（浅色） | 书架 · 网格（浅色） | 书架 · 列表（深色） | 书架 · 网格（护眼） |
+|---|---|---|---|
+| ![](docs/screenshots/01-shelf-list-light.png) | ![](docs/screenshots/02-shelf-grid-light.png) | ![](docs/screenshots/03-shelf-list-dark.png) | ![](docs/screenshots/04-shelf-grid-sepia.png) |
+
+空书架状态：[docs/screenshots/05-shelf-empty.png](docs/screenshots/05-shelf-empty.png)
+
+这些图验证的是**渲染与布局**（列表/网格结构、三种配色、超长书名省略、最近阅读时间格式）。点击、返回键、SAF 选择器、Room 落库等行为仍必须上设备验证——截图通过 ≠ 功能通过。
+
+---
+
 ## 目标范围
 
 ### P0（第一个可用版本）
