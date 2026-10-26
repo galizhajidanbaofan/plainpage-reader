@@ -1,0 +1,3 @@
+typeface=android.graphics.Typeface@190
+kaiWidth=14.0
+sansWidth=14.0

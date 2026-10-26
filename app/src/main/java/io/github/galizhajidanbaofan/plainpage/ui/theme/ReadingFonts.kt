@@ -15,7 +15,7 @@ import io.github.galizhajidanbaofan.plainpage.ui.ReadingFont
  * 取舍：
  * - 默认 / 宋体 / 等线 / 打字机 用系统字族，零包体成本；
  * - 楷体在 Android 上没有系统字族（`cursive` 在中文上会回退到黑体，等于没换），
- *   所以随包带 `LXGW WenKai Lite`（OFL-1.1，9.3 MB）。带上后 APK 会明显变大，
+ *   所以随包带 `LXGW WenKai Lite`（OFL-1.1，9.75 MB）。带上后 APK 会明显变大，
  *   这是「真·楷体」与「假楷体」之间的代价，选前者。
  * - 等线用系统无衬线的 Light 字重近似：Android 没有等线，而细黑是无衬线里最接近的观感。
  */

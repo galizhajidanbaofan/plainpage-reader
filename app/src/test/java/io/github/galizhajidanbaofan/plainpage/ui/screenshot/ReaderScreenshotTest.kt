@@ -76,6 +76,8 @@ class ReaderScreenshotTest {
         tokens: ThemeTokens,
         file: String,
         mode: ReadingMode = ReadingMode.PAGED,
+        font: io.github.galizhajidanbaofan.plainpage.ui.ReadingFont =
+            io.github.galizhajidanbaofan.plainpage.ui.ReadingFont.SYSTEM,
         scrollFraction: Float = 0f,
         chunk: (Int) -> String = { index ->
             val start = ScrollChunkMath.charOffsetOf(index)
@@ -83,7 +85,7 @@ class ReaderScreenshotTest {
         },
     ) {
         compose.setContent {
-            CompositionLocalProvider(LocalAppearance provides AppearanceState(readingMode = mode)) {
+            CompositionLocalProvider(LocalAppearance provides AppearanceState(readingMode = mode, font = font)) {
                 PlainPageTheme(tokens = tokens) {
                     ReaderContent(
                         state = state,
@@ -156,4 +158,25 @@ class ReaderScreenshotTest {
             file = "13-reader-picture.png",
         )
     }
+
+    /**
+     * 楷体：字库里唯一随包带的字体，这张图同时证明 `R.font.lxgw_wenkai_lite` 真能加载
+     * （资源缺失时 Compose 会回退系统字体，截图就和默认字体一模一样，一眼能看出来）。
+     */
+    @Test
+    fun readerKaiFont() = render(
+        state = ready(),
+        tokens = ThemeTokensCatalog.Light,
+        file = "14-reader-kai.png",
+        font = io.github.galizhajidanbaofan.plainpage.ui.ReadingFont.KAI,
+    )
+
+    /** 打字机：等宽字体在正文里的观感（行距与字距都调过，别让中文挤成一团）。 */
+    @Test
+    fun readerTypewriterFont() = render(
+        state = ready(),
+        tokens = ThemeTokensCatalog.Light,
+        file = "15-reader-typewriter.png",
+        font = io.github.galizhajidanbaofan.plainpage.ui.ReadingFont.TYPEWRITER,
+    )
 }
