@@ -195,3 +195,48 @@ BUILD SUCCESSFUL in 19s        # testDebugUnitTest
 - EPUB 的设备端行为：导入 → 书架 → 打开 → 目录跳转 → 杀进程 → 恢复（单测只覆盖 JVM 上的引擎与 UI 状态）。
 - 真实 EPUB 兼容性：目前只在测试夹具（EPUB2 的 NCX 与 EPUB3 的 nav 各一套）与一份人造样本上验证过，**没有跑过真实出版文件**（含加密、脚注、图片密集的样本）。
 - 性能门禁、release 构建、仪器测试：全部未做。
+
+---
+
+# 第四轮实测（阅读模式：左右翻页 / 上下滚动，2026-10-26）
+
+本轮改动的是阅读页的交互骨架，不是引擎：引擎、目录、进度坐标都没动，所以前几轮针对引擎的结论继续有效。
+
+## 1. 命令与结果
+
+```bash
+export JAVA_HOME=<workspace>/.toolchain/jdk21
+export ANDROID_HOME=<workspace>/.toolchain
+export ANDROID_USER_HOME=$ANDROID_HOME/android-home
+export GRADLE_USER_HOME=$ANDROID_HOME/gradle-home
+export JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=<workspace>/.toolchain/tmp
+
+rm -rf app/build/test-results            # 统计前先清旧 XML，避免把上一轮的结果算进来
+./gradlew :app:testDebugUnitTest
+./gradlew :app:assembleDebug :app:lintDebug
+```
+
+结果：
+
+```
+BUILD SUCCESSFUL in 18s     # testDebugUnitTest
+BUILD SUCCESSFUL in 1m 11s  # assembleDebug + lintDebug
+```
+
+- 单元测试 **136 个全通过，22 个测试类，failures=0 errors=0**。本轮新增：`ReaderGestureTest` 6（左滑翻下页、右滑翻上页、左 1/10 轻点翻上页、右 9/10 轻点翻下页、中间轻点不翻页、滚动模式下左右滑不翻页）、`ScrollChunkMathTest` 7（空书无块、整除不多算、余数多一块、偏移落块、越界夹紧、块号回算、百分比封顶）。
+- `lintDebug`：**0 errors, 4 warnings**（`NewerVersionAvailable`×2、`GradleDependency`、`ObsoleteSdkInt` 误报），与上一轮完全一致。
+- 产物：`app/build/outputs/apk/debug/app-debug.apk`，**12,215,495 字节（11.65 MiB）**，比 EPUB 那一版多 40 KB——只多了手势与分块代码，没有新增依赖、没有新增权限。
+
+## 2. 本轮新增的坑
+
+| 现象 | 根因 | 处理 |
+|---|---|---|
+| 翻页与滚动两张截图字节完全相同（md5 一致） | 滚动模式的截图喂的仍是「从 0 开始的同一段文字」，进度线取 `ready.fraction = 0f`，两种模式渲染出来真的一模一样 | 滚动截图改成「锚点在书中段」：`charCount = 24_000`、`anchorChar = 9_000`、`scrollFraction = 0.375f`，块内文字带块序号，两张图从内容到进度线都不同 |
+| 想用两个 `pointerInput` 分别接点击与横向拖动 | `detectTapGestures` 与 `detectHorizontalDragGestures` 都要求拿到第一下触摸，会互相吞手势 | 手写 `awaitEachGesture`：同一次手势里累计位移，超阈值算滑动、小于 `24f` 算轻点，按落点分区 |
+| 滚动模式的 `LazyColumn` 初版没有 `key` | 切块内容异步加载后列表会错位、复用错块 | `itemsIndexed(..., key = { index, _ -> index })`，每块 `remember(index)` + `LaunchedEffect(index)` 单独取文本，未加载时占位 240dp 防抖动 |
+
+## 3. 仍生效的未验证清单
+
+- 设备端手势手感（阈值 `56.dp` 是否合适、轻点分区是否顺手）、进出阅读页的转场动画（`slideInHorizontally(w/6)` 进入、整屏宽滑出退出）都**只在 JVM 与离屏截图上验证过**。
+- 滚动模式在 100 MB 级 TXT 上的实际滚动流畅度与内存占用：分块与 LRU 缓存的设计目标是「只渲染看得见的块」，但**没有在真机上量过**。
+- 性能门禁、release 构建、仪器测试：全部未做。

@@ -4,6 +4,11 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
 import io.github.galizhajidanbaofan.plainpage.domain.model.BookFormat
+import androidx.compose.runtime.CompositionLocalProvider
+import io.github.galizhajidanbaofan.plainpage.ui.AppearanceState
+import io.github.galizhajidanbaofan.plainpage.ui.LocalAppearance
+import io.github.galizhajidanbaofan.plainpage.ui.ReadingMode
+import io.github.galizhajidanbaofan.plainpage.ui.reader.ScrollChunkMath
 import io.github.galizhajidanbaofan.plainpage.ui.reader.ReaderChapter
 import io.github.galizhajidanbaofan.plainpage.ui.reader.ReaderContent
 import io.github.galizhajidanbaofan.plainpage.ui.reader.ReaderUiState
@@ -61,18 +66,35 @@ class ReaderScreenshotTest {
         canPrev = false,
         canNext = true,
         lossyDecoding = lossy,
+        charCount = sampleText.length,
+        anchorChar = 0,
     )
 
-    private fun render(state: ReaderUiState, tokens: ThemeTokens, file: String) {
+    private fun render(
+        state: ReaderUiState,
+        tokens: ThemeTokens,
+        file: String,
+        mode: ReadingMode = ReadingMode.PAGED,
+        scrollFraction: Float = 0f,
+        chunk: (Int) -> String = { index ->
+            val start = ScrollChunkMath.charOffsetOf(index)
+            sampleText.substring(start.coerceIn(0, sampleText.length))
+        },
+    ) {
         compose.setContent {
-            PlainPageTheme(tokens = tokens) {
-                ReaderContent(
-                    state = state,
-                    onBack = {},
-                    onPrevPage = {},
-                    onNextPage = {},
-                    onChapter = {},
-                )
+            CompositionLocalProvider(LocalAppearance provides AppearanceState(readingMode = mode)) {
+                PlainPageTheme(tokens = tokens) {
+                    ReaderContent(
+                        state = state,
+                        onBack = {},
+                        onPrevPage = {},
+                        onNextPage = {},
+                        onChapter = {},
+                        mode = mode,
+                        scrollFraction = scrollFraction,
+                        loadChunk = { index -> chunk(index) },
+                    )
+                }
             }
         }
         compose.waitForIdle()
@@ -93,5 +115,21 @@ class ReaderScreenshotTest {
         ReaderUiState.Unsupported(BookFormat.PDF),
         ThemeTokensCatalog.Light,
         "09-reader-unsupported.png",
+    )
+
+    /**
+     * 滚动模式：没有「上一页/下一页」，只有连续下滚；同一份状态换个模式就该换一套骨架。
+     * 这张图同时证明进度线仍在最底下（2dp，按 charOffset 换算成 37.5%），只是不再有页数文字。
+     *
+     * 为了和翻页截图区分开，这里刻意让锚点落在书中段（第 7 块），块内文字带块序号。
+     */
+    @Test
+    fun readerScrollMode() = render(
+        state = ready().copy(charCount = 24_000, anchorChar = 9_000, fraction = 0.375f),
+        tokens = ThemeTokensCatalog.Light,
+        file = "12-reader-scroll.png",
+        mode = ReadingMode.SCROLL,
+        scrollFraction = 0.375f,
+        chunk = { index -> "第 ${index + 1} 块\n\n$sampleText" },
     )
 }

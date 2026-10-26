@@ -80,6 +80,21 @@ Room(book 行) ──find()──▶ ReaderViewModel ──engineFactory──�
 
 为什么用「固定字符窗口」而不是「按屏幕高度分页」：前者与字体、字号、屏幕密度无关，同一份进度在任何设备上都能恢复到同一段文字；后者必须排版完成才知道一页多少字，进度会跟着设备变。
 
+### 两种阅读模式：一套坐标，两套骨架
+
+`ReadingMode` 从 `AppearanceState` 读出来（`SettingsScreen` 里切换），只影响 `ReaderContent` 用哪套骨架，不影响引擎、进度、目录：
+
+```
+ReaderUiState.Ready ──mode==PAGED──▶ PagedBody：AnimatedContent + 固定字符窗口
+                    └─mode==SCROLL─▶ ScrollBody：LazyColumn + 定长分块（ScrollChunkMath.CHUNK_CHARS = 1500）
+```
+
+- **左右翻页**：`pageTurnGestures` 一次手势里自己判断——横向累计位移超过 `56.dp` 就翻页（左负右正），否则位移小于 `24f` 的算轻点，按落点位于左 1/3 / 右 2/3 决定上一页或下一页，中间不动。纵向滑动不消费、也不滚动正文。
+  为什么不叠 `detectTapGestures` + `detectHorizontalDragGestures`：两个检测器都要抢第一下触摸，叠起来会出现滑动被当点击、或点击被吞。
+- **上下滚动**：整本按 `1500` 字符切块，`LazyColumn` 只渲染看得见的块；每块内容走 `ReaderViewModel.textChunk(index)`，命中 24 条的 LRU 缓存就不碰文件，未命中才在 IO 线程 `readText`。左右滑动不接任何手势。
+- **进度只有一套坐标**：滚动模式用「第一块可见的块」×`1500` 换算成 `anchorChar`，与翻页模式存的是同一个「全书字符偏移」；`_scrollFraction` 只负责底部那条 2dp 进度线。滚动时的写盘做 300ms 防抖，退出阅读页时 `flushScrollProgress` 不等防抖。
+- **底栏**：两种模式都只剩一条 2dp 进度线（底衬 `divider` + 填充 `accent`），不再有页码与「上一页 / 下一页」按钮——翻页模式下那两个按钮与左右轻点功能重复，还占掉一行正文。
+
 ### EPUB：把「章节资源」压平成一条全书文本
 
 EPUB 的坐标本来是「href + 章内位置」，阅读页只有一套翻页逻辑，所以 `EpubReaderEngine` 打开时做一次**流式压平**：

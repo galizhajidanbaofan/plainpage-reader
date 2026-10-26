@@ -17,7 +17,7 @@
 
 ## 状态（务必先读）
 
-**当前：构建通过、书架/导入/最近阅读已落地，TXT 与 EPUB 都能真的读——分章目录、按窗口翻页、进度写回与恢复都在代码里跑通并有单测。PDF 的引擎还没写，点进去会明确显示「引擎还没接入」而不是假装打开。** 下表是诚实进度。
+**当前：构建通过、书架/导入/最近阅读已落地，TXT 与 EPUB 都能真的读——分章目录、两种阅读模式（左右翻页 / 上下滚动）、进度写回与恢复都在代码里跑通并有单测。PDF 的引擎还没写，点进去会明确显示「引擎还没接入」而不是假装打开。** 下表是诚实进度。
 
 | 能力 | 代码 | 构建 | 真机验收 |
 |---|---|---|---|
@@ -33,10 +33,11 @@
 | 打开 EPUB → 正文渲染 + 翻页 | ✅ | ✅ 通过 | 未验证 |
 | EPUB 目录（NCX / nav / spine 兜底）/ 跳章 / 进度恢复 | ✅ | ✅ 通过（含闭环单测） | 未验证 |
 | 导入时读 EPUB 书名与作者 | ✅ | ✅ 通过 | 未验证 |
+| 阅读模式切换：左右翻页（禁纵向）/ 上下滚动（无翻页） | ✅ | ✅ 通过（含手势与分块单测） | 未验证 |
 | PDF 打开 / 页码跳转 | 未开始 | — | 未验证 |
 | 性能目标（冷启动 <2s、大文件不 ANR） | 未开始 | — | **未测量** |
 
-已实测（2026-10-26）：`assembleDebug` 产出 **12.18 MB** debug APK；**122 个单元测试全通过**（含 11 张离屏截图、TXT 与 EPUB 各自的「存进度→重开→同一屏」闭环、EPUB 的 ZIP 穿越 / XXE / 超限 / 损坏用例）；`lintDebug` **0 errors / 4 warnings**（3 条依赖版本提示、1 条自适应图标目录误报，均为已知取舍）；APK `minSdkVersion 26`、`targetSdkVersion 37`、**无 `INTERNET` 权限、无存储权限**。完整命令与原始输出见 [docs/build-verification.md](docs/build-verification.md)，分层与线程模型见 [docs/architecture.md](docs/architecture.md)，工具链细节见 [docs/environment.md](docs/environment.md)。
+已实测（2026-10-26）：`assembleDebug` 产出 **12.22 MB** debug APK；**136 个单元测试全通过**（含 12 张离屏截图、TXT 与 EPUB 各自的「存进度→重开→同一屏」闭环、翻页手势的点击/滑动分区、滚动模式的分块换算、EPUB 的 ZIP 穿越 / XXE / 超限 / 损坏用例）；`lintDebug` **0 errors / 4 warnings**（3 条依赖版本提示、1 条自适应图标目录误报，均为已知取舍）；APK `minSdkVersion 26`、`targetSdkVersion 37`、**无 `INTERNET` 权限、无存储权限**。完整命令与原始输出见 [docs/build-verification.md](docs/build-verification.md)，分层与线程模型见 [docs/architecture.md](docs/architecture.md)，工具链细节见 [docs/environment.md](docs/environment.md)。
 
 尚未验证：导入 / 打开 / 跳转 / 进度恢复的设备端行为（本机模拟器无法启动，详见 docs/build-verification.md）、release 混淆构建、性能门禁。
 
@@ -60,9 +61,20 @@
 |---|---|---|---|
 | ![](docs/screenshots/06-reader-light.png) | ![](docs/screenshots/07-reader-sepia.png) | ![](docs/screenshots/08-reader-dark.png) | ![](docs/screenshots/09-reader-unsupported.png) |
 
+| 阅读 · 上下滚动模式 |
+|---|
+| ![](docs/screenshots/12-reader-scroll.png) |
+
+阅读页有两种模式，在「设置 → 翻页方式」里切换：
+
+- **左右翻页**：轻点屏幕左 1/3 翻上一页、右 1/3 翻下一页，中间不动；左右滑动也能翻页；纵向滑动不翻页、也不会滚动正文。
+- **上下滚动**：整本连续下滚，没有「上一页 / 下一页」，左右滑动不翻页（避免用户比划一下页面就偷偷跳走）。
+
+两种模式共用同一套进度坐标（全书字符偏移），所以随时切换都能接上；底部只保留一条 2dp 的进度线，不再有页码与上一页/下一页按钮。
+
 设计取向与规则（配色、字阶、间距、为什么不用卡片和浮动按钮）写在 [docs/design-system.md](docs/design-system.md)。
 
-这些图验证的是**渲染与布局**（列表/网格结构、三种配色、超长书名省略、最近阅读时间格式、正文段首缩进与翻页条）。点击、返回键、SAF 选择器、Room 落库等行为仍必须上设备验证——截图通过 ≠ 功能通过。
+这些图验证的是**渲染与布局**（列表/网格结构、三种配色、超长书名省略、最近阅读时间格式、正文段首缩进与进度线、滚动模式的分块渲染）。点击、滑动翻页、返回键、SAF 选择器、Room 落库等行为仍必须上设备验证——截图通过 ≠ 功能通过；其中翻页手势与滚动分块另有 JVM 行为测试兜底（`ReaderGestureTest`、`ScrollChunkMathTest`）。
 
 ---
 
@@ -116,7 +128,7 @@ Repository（Room 存书目与进度，DataStore 存外观设置，文件在私�
 git clone https://github.com/galizhajidanbaofan/plainpage-reader.git
 cd plainpage-reader
 ./gradlew :app:assembleDebug        # 构建 debug APK
-./gradlew :app:testDebugUnitTest    # 单元测试（122 个，含 11 张截图）
+./gradlew :app:testDebugUnitTest    # 单元测试（136 个，含 12 张截图）
 ./gradlew :app:lintDebug            # Lint
 ```
 

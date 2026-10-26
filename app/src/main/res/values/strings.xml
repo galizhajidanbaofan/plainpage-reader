@@ -36,10 +36,7 @@
 
     <string name="reader_toc">目录</string>
     <string name="reader_kicker_chapters">共 %1$d 章</string>
-    <string name="reader_toc_page">第 %1$d 页</string>
-    <string name="reader_prev_page">上一页</string>
-    <string name="reader_next_page">下一页</string>
-    <string name="reader_page_progress">%1$d / %2$d · %3$d%%</string>
+    <string name="reader_toc_percent">%1$d%%</string>
     <string name="reader_lossy">正文可能不完整，或出现无法识别的字符</string>
     <string name="reader_unsupported">%1$s 阅读引擎还没接入，当前支持 EPUB 与 TXT</string>
     <string name="reader_error_missing">文件不在了：可能被系统清理，或读取权限已失效</string>
@@ -59,6 +56,6 @@
     <string name="theme_sepia">护眼</string>
     <string name="layout_list">列表</string>
     <string name="layout_grid">网格</string>
-    <string name="mode_paged">翻页</string>
-    <string name="mode_scroll">滚动</string>
+    <string name="mode_paged">左右翻页</string>
+    <string name="mode_scroll">上下滚动</string>
 </resources>

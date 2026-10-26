@@ -1,6 +1,12 @@
 package io.github.galizhajidanbaofan.plainpage.ui
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -243,6 +249,34 @@ private fun PlainPageNavHost(
         composable(
             route = ROUTE_READER_PATTERN,
             arguments = listOf(navArgument(ARG_BOOK_ID) { type = NavType.LongType }),
+            // 进出阅读页的转场：纸页从右侧压上来，退出时整页顺着来路退回去。
+            // 用位移 + 淡入淡出而不是「瞬间切换」：阅读是慢动作，动画也该是慢的。
+            enterTransition = {
+                slideInHorizontally(
+                    animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+                    initialOffsetX = { width -> width / 6 },
+                ) + fadeIn(animationSpec = tween(durationMillis = 200))
+            },
+            exitTransition = {
+                slideOutHorizontally(
+                    animationSpec = tween(durationMillis = 200),
+                    targetOffsetX = { width -> -width / 12 },
+                ) + fadeOut(animationSpec = tween(durationMillis = 160))
+            },
+            popEnterTransition = {
+                slideInHorizontally(
+                    animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
+                    initialOffsetX = { width -> -width / 12 },
+                ) + fadeIn(animationSpec = tween(durationMillis = 200))
+            },
+            popExitTransition = {
+                // 退出：往右退出屏幕，同时淡出。位移量给足（整屏宽度），
+                // 半途消失会显得"页被撕掉"，退干净才像合上书。
+                slideOutHorizontally(
+                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+                    targetOffsetX = { width -> width },
+                ) + fadeOut(animationSpec = tween(durationMillis = 220))
+            },
         ) { entry ->
             val bookId = entry.arguments?.getLong(ARG_BOOK_ID) ?: return@composable
             ReaderScreen(
