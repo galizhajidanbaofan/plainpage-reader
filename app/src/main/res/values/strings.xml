@@ -40,8 +40,8 @@
     <string name="reader_prev_page">上一页</string>
     <string name="reader_next_page">下一页</string>
     <string name="reader_page_progress">%1$d / %2$d · %3$d%%</string>
-    <string name="reader_lossy">编码可能识别有误，正文里出现了无法识别的字符</string>
-    <string name="reader_unsupported">%1$s 阅读引擎还没接入，当前只支持 TXT</string>
+    <string name="reader_lossy">正文可能不完整，或出现无法识别的字符</string>
+    <string name="reader_unsupported">%1$s 阅读引擎还没接入，当前支持 EPUB 与 TXT</string>
     <string name="reader_error_missing">文件不在了：可能被系统清理，或读取权限已失效</string>
     <string name="reader_error_corrupted">文件损坏或格式不对，打不开</string>
     <string name="reader_error_encoding">编码识别失败，无法解析正文</string>
@@ -49,7 +49,6 @@
     <string name="reader_error_too_large">文件太大，暂时打不开</string>
     <string name="reader_error_unknown">打开失败：未知错误</string>
 
-    <string name="settings_appearance">外观</string>
     <string name="settings_kicker">偏好 · 只存本机</string>
     <string name="settings_reading_theme">阅读主题</string>
     <string name="settings_shelf_layout">书架布局</string>

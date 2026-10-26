@@ -60,10 +60,10 @@ di/                      AppContainer：手写组合根（不引 Hilt/Koin）
 | `EpubReaderEngine` | 自研最小 EPUB2/3（ZIP + `container.xml` → OPF spine → NCX/nav 目录） | href + 章节内百分比 |
 | `PdfReaderEngine` | 平台 `PdfRenderer` 渲染位图 | 页码 + 页内滚动比例 |
 
-### 阅读页的数据流（当前已接入 TXT）
+### 阅读页的数据流（当前已接入 TXT 与 EPUB）
 
 ```
-Room(book 行) ──find()──▶ ReaderViewModel ──engineFactory──▶ TxtReaderEngine
+Room(book 行) ──find()──▶ ReaderViewModel ──engineFactory──▶ TxtReaderEngine / EpubReaderEngine
                               │                                 │
                               │◀── loadOutline() / restoreProgress()
                               │
@@ -79,6 +79,27 @@ Room(book 行) ──find()──▶ ReaderViewModel ──engineFactory──�
 - **UI 只吃状态**：`ReaderContent` 不碰文件、不碰数据库，所以截图测试可以直接喂假状态。
 
 为什么用「固定字符窗口」而不是「按屏幕高度分页」：前者与字体、字号、屏幕密度无关，同一份进度在任何设备上都能恢复到同一段文字；后者必须排版完成才知道一页多少字，进度会跟着设备变。
+
+### EPUB：把「章节资源」压平成一条全书文本
+
+EPUB 的坐标本来是「href + 章内位置」，阅读页只有一套翻页逻辑，所以 `EpubReaderEngine` 打开时做一次**流式压平**：
+
+1. `EpubArchive` 打开 ZIP，只认 `mimetype`/`META-INF/container.xml`；
+2. `EpubPackageParser` 解 OPF：`dc:title`、`dc:creator`、manifest、spine（`linear="no"` 跳过）；
+3. 按 spine 顺序逐章读 XHTML，`HtmlTextExtractor` 去掉标签（跳过 `head`/`script`/`style`/`svg`，块级标签换行，实体解码），拼成全书文本并记录每章 `[charStart, charEnd)`；
+4. `EpubOutlineParser` 取目录：NCX → EPUB3 `nav[epub:type=toc]` → spine 文件名兜底；
+5. 进度双向换算：`positionOf(offset)` 给出 `ReadingLocation.Epub(href, 章内百分比)`，`charOffsetOf(locator)` 换回全书偏移。
+
+安全性（EPUB 是外部来的不可信文件）：
+
+| 风险 | 处理 |
+|---|---|
+| ZIP 路径穿越（`../../x`） | `ZipPaths.normalize` 解析成绝对路径的一律丢弃；条目名不一致的也别想读到 |
+| 条目解压炸弹 | 单条目上限 `MAX_CHAPTER_BYTES`，XML 上限 `MAX_XML_BYTES`，超限抛 `TOO_LARGE` 而不是 OOM |
+| XML 外部实体（XXE） | 关闭外部 DTD/实体，实体解析器返回空串，绝不发起 IO |
+| 正文过大 | 全书文本上限 `EpubLimits.MAX_TOTAL_CHARS`，超出后剩余章节不读入并置 `truncated`（对外表现为 `lossyDecoding = true`），界面提示「可能不完整」 |
+
+代价与取舍：图片、样式、脚注跳转在 P0 一律不进文本流（只留文字），换来的是「翻页与进度和 TXT 完全同构」，UI 层不用为格式分支。
 
 ## 为什么不引这些依赖
 

@@ -21,4 +21,13 @@ interface PaginatedEngine : ReaderEngine {
 
     /** 由字符偏移反推可持久化的位置；没有可持久化位置时返回 null。 */
     fun positionOf(charOffset: Int): ReadingLocation?
+
+    /**
+     * 把持久化位置换算回字符偏移，用于"从上次位置继续读"。
+     *
+     * 默认实现只认 [ReadingLocation.Txt]：TXT 的偏移就是它自己的坐标。
+     * EPUB 覆盖它，把 href + 章内百分比换回全书偏移——这样阅读页对三种格式只有一套翻页逻辑。
+     */
+    fun charOffsetOf(location: ReadingLocation): Int? =
+        (location as? ReadingLocation.Txt)?.charOffset
 }

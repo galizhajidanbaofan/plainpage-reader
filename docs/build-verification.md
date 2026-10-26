@@ -1,7 +1,7 @@
 # 构建验证记录
 
 > 这份文件记录**实际跑过的命令与真实输出**，不是愿望清单。改动构建配置时请更新这里。
-> 最近更新：2026-10-25。
+> 最近更新：2026-10-26（EPUB 引擎）。
 
 ## 1. 本机工具链（构建机实测）
 
@@ -150,6 +150,48 @@ BUILD SUCCESSFUL in 41s
 
 ## 4. 仍未验证
 
-- 导入 / 书架 / 删除 / 最近阅读的**设备端**实际行为（单测只覆盖纯逻辑与实体映射）。
-- 阅读页目前是占位页，"打开书籍"只到占位页为止，正文渲染尚未实现。
-- 性能门禁、release 构建、仪器测试：同前一轮，全部未做。
+- 导入 / 书架 / 删除 / 最近阅读 / 目录跳转 / 翻页 / 杀进程后进度恢复的**设备端**实际行为（单测只覆盖纯逻辑与实体映射）。
+- 性能门禁、release 构建、仪器测试：全部未做。
+
+---
+
+# 第三轮实测（EPUB 引擎，2026-10-26）
+
+## 1. 命令与结果
+
+```bash
+export JAVA_HOME=<workspace>/.toolchain/jdk21
+export ANDROID_HOME=<workspace>/.toolchain
+export ANDROID_USER_HOME=$ANDROID_HOME/android-home
+export GRADLE_USER_HOME=$ANDROID_HOME/gradle-home
+export JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=<workspace>/.toolchain/tmp
+
+./gradlew :app:assembleDebug :app:lintDebug
+./gradlew :app:testDebugUnitTest          # 先删了 app/build/test-results 再跑，避免旧 XML 被计入
+```
+
+结果：
+
+```
+BUILD SUCCESSFUL in 1m 10s     # assembleDebug + lintDebug
+BUILD SUCCESSFUL in 19s        # testDebugUnitTest
+```
+
+- 单元测试 **122 个全通过，20 个测试类，failures=0 errors=0**。本轮新增：`HtmlTextExtractorTest` 11、`EpubArchiveTest` 8、`EpubReaderEngineTest` 8、`EpubPackageParserTest` 7、`EpubMetadataReaderTest` 4、`EpubOutlineParserTest` 4。
+- `lintDebug`：**0 errors, 4 warnings**（2 条 `NewerVersionAvailable`、1 条 `GradleDependency`、1 条 `ObsoleteSdkInt` 误报），与上一轮同类。
+- 产物：`app/build/outputs/apk/debug/app-debug.apk`，**12,175,943 字节（11.61 MiB）**，比阶段 2 多 88 KB——只多了解析器与索引代码，没有新增依赖，没有新增权限。
+
+## 2. 本轮新增的坑
+
+| 现象 | 根因 | 处理 |
+|---|---|---|
+| 6 个 EPUB 测试全挂在 `SAXParseException: Content is not allowed in prolog` | 测试夹具用 `trimIndent()` 拼 XML，但 `<?xml ...?>` 前面有 `$` 插值留下的缩进/换行 | 夹具改用 `buildString` / 拼接时不依赖 `trimIndent`，并在 `EpubFixtures` 注释里写明"prolog 前不能有任何字符" |
+| `XMLConstants.ACCESS_EXTERNAL_DTD` 编译不过（`Unresolved reference`） | Android SDK 里没有 JAXP 1.5 的 `XMLConstants` 对应常量（那是 JDK 的） | 用字符串字面量 `"http://javax.xml.XMLConstants/property/accessExternalDTD"` 设 `DocumentBuilderFactory` 属性，两平台都能跑 |
+| 章节区间测试算出来的 `charEnd` 少 1 | 断言按"含尾"写，实际代码按排他上界（注释也写了"空间首尾相接"） | 改断言为排他语义，并在 `EpubIndex` 类注释里再次点明 |
+| `EpubDebugTest` 的结果残留在 `test-results` 里，把总数报成 123 | 删了源文件但没删 build 产物，旧 XML 还在被统计 | 统计前 `rm -rf app/build/test-results`；CI 里应从干净 build 目录统计 |
+
+## 3. 仍生效的未验证清单
+
+- EPUB 的设备端行为：导入 → 书架 → 打开 → 目录跳转 → 杀进程 → 恢复（单测只覆盖 JVM 上的引擎与 UI 状态）。
+- 真实 EPUB 兼容性：目前只在测试夹具（EPUB2 的 NCX 与 EPUB3 的 nav 各一套）与一份人造样本上验证过，**没有跑过真实出版文件**（含加密、脚注、图片密集的样本）。
+- 性能门禁、release 构建、仪器测试：全部未做。

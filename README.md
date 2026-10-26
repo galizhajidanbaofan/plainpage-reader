@@ -17,7 +17,7 @@
 
 ## 状态（务必先读）
 
-**当前：构建通过、书架/导入/最近阅读已落地，TXT 已能真的读——分章目录、按窗口翻页、进度写回与恢复都在代码里跑通并有单测。EPUB 与 PDF 的引擎还没写，点进去会明确显示「引擎还没接入」而不是假装打开。** 下表是诚实进度。
+**当前：构建通过、书架/导入/最近阅读已落地，TXT 与 EPUB 都能真的读——分章目录、按窗口翻页、进度写回与恢复都在代码里跑通并有单测。PDF 的引擎还没写，点进去会明确显示「引擎还没接入」而不是假装打开。** 下表是诚实进度。
 
 | 能力 | 代码 | 构建 | 真机验收 |
 |---|---|---|---|
@@ -30,11 +30,13 @@
 | 最近阅读（按 `lastOpenedAt` 排序） | ✅ | ✅ 通过 | 未验证 |
 | 打开 TXT → 正文渲染 + 翻页 | ✅ | ✅ 通过 | 未验证 |
 | TXT 目录 / 跳章 / 进度恢复 | ✅ | ✅ 通过（含闭环单测） | 未验证 |
-| EPUB 打开 / 目录 / 进度 | 未开始 | — | 未验证 |
+| 打开 EPUB → 正文渲染 + 翻页 | ✅ | ✅ 通过 | 未验证 |
+| EPUB 目录（NCX / nav / spine 兜底）/ 跳章 / 进度恢复 | ✅ | ✅ 通过（含闭环单测） | 未验证 |
+| 导入时读 EPUB 书名与作者 | ✅ | ✅ 通过 | 未验证 |
 | PDF 打开 / 页码跳转 | 未开始 | — | 未验证 |
 | 性能目标（冷启动 <2s、大文件不 ANR） | 未开始 | — | **未测量** |
 
-已实测（2026-10-25）：`assembleDebug` 产出 **12.09 MB** debug APK；**78 个单元测试全通过**（含 8 张离屏截图、TXT「存进度→重开→同一屏」闭环）；`lintDebug` **0 errors / 4 warnings**（3 条是 Kotlin 版本已知取舍，1 条是 AAPT 要求 adaptive icon 放 `-v26` 目录导致的误报）；APK `minSdkVersion 26`、`targetSdkVersion 37`、**无 `INTERNET` 权限、无存储权限**。完整命令与原始输出见 [docs/build-verification.md](docs/build-verification.md)，分层与线程模型见 [docs/architecture.md](docs/architecture.md)，工具链细节见 [docs/environment.md](docs/environment.md)。
+已实测（2026-10-26）：`assembleDebug` 产出 **12.18 MB** debug APK；**122 个单元测试全通过**（含 11 张离屏截图、TXT 与 EPUB 各自的「存进度→重开→同一屏」闭环、EPUB 的 ZIP 穿越 / XXE / 超限 / 损坏用例）；`lintDebug` **0 errors / 4 warnings**（3 条依赖版本提示、1 条自适应图标目录误报，均为已知取舍）；APK `minSdkVersion 26`、`targetSdkVersion 37`、**无 `INTERNET` 权限、无存储权限**。完整命令与原始输出见 [docs/build-verification.md](docs/build-verification.md)，分层与线程模型见 [docs/architecture.md](docs/architecture.md)，工具链细节见 [docs/environment.md](docs/environment.md)。
 
 尚未验证：导入 / 打开 / 跳转 / 进度恢复的设备端行为（本机模拟器无法启动，详见 docs/build-verification.md）、release 混淆构建、性能门禁。
 
@@ -54,7 +56,7 @@
 |---|---|---|---|
 | ![](docs/screenshots/03-shelf-list-dark.png) | ![](docs/screenshots/04-shelf-grid-sepia.png) | ![](docs/screenshots/10-settings-light.png) | ![](docs/screenshots/11-settings-dark.png) |
 
-| 阅读 · 浅色 | 阅读 · 护眼 | 阅读 · 深色 | 引擎未接入 |
+| 阅读 · 浅色 | 阅读 · 护眼 | 阅读 · 深色 | PDF 引擎未接入 |
 |---|---|---|---|
 | ![](docs/screenshots/06-reader-light.png) | ![](docs/screenshots/07-reader-sepia.png) | ![](docs/screenshots/08-reader-dark.png) | ![](docs/screenshots/09-reader-unsupported.png) |
 
@@ -85,7 +87,7 @@ OCR、PDF 文本选择与批注、DRM、账号、云同步、网络请求、TTS�
 
 ---
 
-## 设计要点（计划）
+## 设计要点
 
 ```
 UI (Compose)  ──按配置注入──▶  ThemeTokens / LayoutMode / 书架布局
@@ -114,7 +116,7 @@ Repository（Room 存书目与进度，DataStore 存外观设置，文件在私�
 git clone https://github.com/galizhajidanbaofan/plainpage-reader.git
 cd plainpage-reader
 ./gradlew :app:assembleDebug        # 构建 debug APK
-./gradlew :app:testDebugUnitTest    # 单元测试（78 个，含 8 张截图）
+./gradlew :app:testDebugUnitTest    # 单元测试（122 个，含 11 张截图）
 ./gradlew :app:lintDebug            # Lint
 ```
 

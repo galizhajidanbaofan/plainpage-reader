@@ -12,7 +12,6 @@ import io.github.galizhajidanbaofan.plainpage.domain.engine.ReaderEngine
 import io.github.galizhajidanbaofan.plainpage.domain.engine.ReaderException
 import io.github.galizhajidanbaofan.plainpage.domain.model.Book
 import io.github.galizhajidanbaofan.plainpage.domain.model.BookFormat
-import io.github.galizhajidanbaofan.plainpage.domain.model.ReadingLocation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -97,14 +96,19 @@ class ReaderViewModel(
             return
         }
 
-        chapters = created.loadOutline().map { item ->
-            val offset = (item.location as? ReadingLocation.Txt)?.charOffset ?: 0
+        chapters = created.loadOutline().mapNotNull { item ->
+            // 目录项的位置可能是 Txt 偏移，也可能是 Epub 的 href：统一由引擎换算成全书偏移。
+            val offset = paginated.charOffsetOf(item.location) ?: return@mapNotNull null
             ReaderChapter(title = item.title, charStart = offset)
+        }
+        if (chapters.isEmpty()) {
+            _state.value = ReaderUiState.Failed(ReaderException.Reason.EMPTY_CONTENT)
+            return
         }
         pager = ReaderPager(paginated.charCount)
 
-        val restored = created.restoreProgress() as? ReadingLocation.Txt
-        startChar = pager?.clampToPage(restored?.charOffset ?: 0) ?: 0
+        val restoredOffset = created.restoreProgress()?.let(paginated::charOffsetOf)
+        startChar = pager?.clampToPage(restoredOffset ?: 0) ?: 0
         render()
     }
 

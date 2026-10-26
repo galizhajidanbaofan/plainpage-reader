@@ -3,6 +3,7 @@ package io.github.galizhajidanbaofan.plainpage.data.importing
 import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
+import io.github.galizhajidanbaofan.plainpage.domain.engine.epub.EpubMetadataReader
 import io.github.galizhajidanbaofan.plainpage.domain.importing.ImportRules
 import io.github.galizhajidanbaofan.plainpage.domain.model.Book
 import io.github.galizhajidanbaofan.plainpage.domain.model.BookFormat
@@ -94,9 +95,14 @@ class BookImporter(
             return@withContext ImportResult.Rejected(ImportRejection.IO_ERROR)
         }
 
+        // EPUB 自带书名/作者：解析失败就用文件名，绝不让"元数据坏了"变成"导入失败"。
+        val parsedMeta = if (format == BookFormat.EPUB) EpubMetadataReader.read(targetFile) else null
+
         ImportResult.Success(
             Book(
-                title = ImportRules.titleFromFileName(meta.displayName),
+                title = parsedMeta?.title?.takeIf { it.isNotBlank() }
+                    ?: ImportRules.titleFromFileName(meta.displayName),
+                author = parsedMeta?.author,
                 format = format,
                 localPath = targetFile.absolutePath,
                 sourceUri = uri.toString(),
