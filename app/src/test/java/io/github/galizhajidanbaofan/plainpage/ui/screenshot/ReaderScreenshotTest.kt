@@ -1,5 +1,6 @@
 package io.github.galizhajidanbaofan.plainpage.ui.screenshot
 
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -132,4 +133,27 @@ class ReaderScreenshotTest {
         scrollFraction = 0.375f,
         chunk = { index -> "第 ${index + 1} 块\n\n$sampleText" },
     )
+
+    /**
+     * 整页插图：EPUB 里占满一屏，等比例缩放、上下留白居中，图注在图下。
+     * 用一张手绘的示意图而不是真照片，免得仓库里多出个来源不明的二进制。
+     */
+    @Test
+    fun readerPicturePage() {
+        val width = 900
+        val height = 1200
+        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        canvas.drawColor(0xFF6E7F76.toInt())
+        val paint = android.graphics.Paint().apply { color = 0xFFEFF1EC.toInt() }
+        for (i in 0 until 7) {
+            val y = height * (i + 1) / 8f
+            canvas.drawRect(width * 0.12f, y, width * 0.88f, y + 6f, paint)
+        }
+        render(
+            state = ready().copy(text = "", picture = bitmap.asImageBitmap(), pictureCaption = "插图：1978 年的雪夜（示意图）"),
+            tokens = ThemeTokensCatalog.Light,
+            file = "13-reader-picture.png",
+        )
+    }
 }

@@ -3,6 +3,8 @@ package io.github.galizhajidanbaofan.plainpage.domain.engine.epub
 import io.github.galizhajidanbaofan.plainpage.domain.engine.BookMetadata
 import io.github.galizhajidanbaofan.plainpage.domain.engine.OutlineItem
 import io.github.galizhajidanbaofan.plainpage.domain.engine.PaginatedEngine
+import io.github.galizhajidanbaofan.plainpage.domain.engine.PictureRef
+import io.github.galizhajidanbaofan.plainpage.domain.engine.PictureSource
 import io.github.galizhajidanbaofan.plainpage.domain.engine.ReaderException
 import io.github.galizhajidanbaofan.plainpage.domain.model.Book
 import io.github.galizhajidanbaofan.plainpage.domain.model.ReadingLocation
@@ -27,7 +29,7 @@ import java.util.zip.ZipException
  */
 class EpubReaderEngine(
     private val progressSink: (suspend (ReadingLocation, Float) -> Unit)? = null,
-) : PaginatedEngine {
+) : PaginatedEngine, PictureSource {
 
     private var book: Book? = null
     private var archive: EpubArchive? = null
@@ -38,6 +40,8 @@ class EpubReaderEngine(
 
     /** 正文被截断时也置 true：界面上的"可能不完整"提示对两者都适用。 */
     override val lossyDecoding: Boolean get() = index?.truncated == true
+
+    override val pictures: List<PictureRef> get() = index?.pictures.orEmpty()
 
     override suspend fun open(book: Book): BookMetadata {
         close()
@@ -114,6 +118,18 @@ class EpubReaderEngine(
         index = null
         packageInfo = null
         book = null
+    }
+
+    /**
+     * 取插图字节。图片在 EPUB 里就是普通条目，这里只做「存在性 + 上限」两道拦截：
+     * 缺失的图返回 null 让 UI 跳过，超限的图同样跳过而不是让整本书打开失败。
+     */
+    override suspend fun pictureBytes(path: String): ByteArray? {
+        val current = archive ?: return null
+        return withContext(Dispatchers.IO) {
+            runCatching { current.readBytesIfPresent(path, EpubLimits.MAX_PICTURE_BYTES) }
+                .getOrElse { null }
+        }
     }
 
     override suspend fun readText(startChar: Int, count: Int): String {

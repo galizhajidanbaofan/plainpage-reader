@@ -1,11 +1,15 @@
 package io.github.galizhajidanbaofan.plainpage.ui
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -218,10 +222,19 @@ private fun PlainPageNavHost(
     onOpenBook: (Book) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 底部导航之间的切换：短促淡入淡出。不设这些默认值的话，
+    // navigation-compose 会用 700ms 的超长淡入，点一下像卡了一下。
+    val tabEnter = fadeIn(animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing))
+    val tabExit = fadeOut(animationSpec = tween(durationMillis = 160))
+
     NavHost(
         navController = navController,
         startDestination = Destination.SHELF.route,
         modifier = modifier,
+        enterTransition = { tabEnter },
+        exitTransition = { tabExit },
+        popEnterTransition = { tabEnter },
+        popExitTransition = { tabExit },
     ) {
         composable(Destination.SHELF.route) {
             ShelfScreen(
@@ -249,13 +262,16 @@ private fun PlainPageNavHost(
         composable(
             route = ROUTE_READER_PATTERN,
             arguments = listOf(navArgument(ARG_BOOK_ID) { type = NavType.LongType }),
-            // 进出阅读页的转场：纸页从右侧压上来，退出时整页顺着来路退回去。
-            // 用位移 + 淡入淡出而不是「瞬间切换」：阅读是慢动作，动画也该是慢的。
+            // 进出阅读页的转场。
+            // 进场：纸页从右侧轻轻压上来（位移只给 1/8 屏宽，不整屏横扫）；
+            // 退场：整页缩到 0.96 再淡掉，同时向右带一点点——像把书合上放回书架。
+            // 这里刻意让淡出的透明度先动、位移后到（位移时间更长），
+            // 所以眼睛看到的是「页子暗下去再滑走」，而不是一边糊一边飞。
             enterTransition = {
                 slideInHorizontally(
-                    animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
-                    initialOffsetX = { width -> width / 6 },
-                ) + fadeIn(animationSpec = tween(durationMillis = 200))
+                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                    initialOffsetX = { width -> width / 8 },
+                ) + fadeIn(animationSpec = tween(durationMillis = 240))
             },
             exitTransition = {
                 slideOutHorizontally(
@@ -270,12 +286,13 @@ private fun PlainPageNavHost(
                 ) + fadeIn(animationSpec = tween(durationMillis = 200))
             },
             popExitTransition = {
-                // 退出：往右退出屏幕，同时淡出。位移量给足（整屏宽度），
-                // 半途消失会显得"页被撕掉"，退干净才像合上书。
-                slideOutHorizontally(
-                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
-                    targetOffsetX = { width -> width },
-                ) + fadeOut(animationSpec = tween(durationMillis = 220))
+                scaleOut(
+                    animationSpec = tween(durationMillis = 320, easing = FastOutLinearInEasing),
+                    targetScale = 0.96f,
+                ) + slideOutHorizontally(
+                    animationSpec = tween(durationMillis = 320, easing = FastOutLinearInEasing),
+                    targetOffsetX = { width -> width / 10 },
+                ) + fadeOut(animationSpec = tween(durationMillis = 260, delayMillis = 40))
             },
         ) { entry ->
             val bookId = entry.arguments?.getLong(ARG_BOOK_ID) ?: return@composable

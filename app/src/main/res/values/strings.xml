@@ -50,6 +50,7 @@
     <string name="settings_reading_theme">阅读主题</string>
     <string name="settings_shelf_layout">书架布局</string>
     <string name="settings_reading_mode">翻页方式</string>
+    <string name="settings_font">正文字体</string>
 
     <string name="theme_light">浅色</string>
     <string name="theme_dark">深色</string>
@@ -58,4 +59,9 @@
     <string name="layout_grid">网格</string>
     <string name="mode_paged">左右翻页</string>
     <string name="mode_scroll">上下滚动</string>
+    <string name="font_system">默认黑体</string>
+    <string name="font_song">宋体</string>
+    <string name="font_kai">楷体</string>
+    <string name="font_deng">等线</string>
+    <string name="font_typewriter">打字机</string>
 </resources>

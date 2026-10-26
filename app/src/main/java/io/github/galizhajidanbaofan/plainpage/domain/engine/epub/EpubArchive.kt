@@ -36,6 +36,9 @@ internal class EpubArchive(private val file: File) : Closeable {
 
     fun contains(path: String): Boolean = entries.containsKey(path)
 
+    /** 条目声明的大小；不存在返回 null。用来在解压前筛掉明显是项目符号的小图。 */
+    fun sizeOf(path: String): Long? = entries[path]?.size
+
     /** 不存在返回 null；超过 [maxBytes] 视为异常文件，抛 TOO_LARGE 而不是硬读。 */
     fun readBytesIfPresent(path: String, maxBytes: Int): ByteArray? {
         val entry = entries[path] ?: return null

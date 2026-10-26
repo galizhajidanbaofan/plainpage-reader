@@ -34,6 +34,15 @@ internal object EpubLimits {
     const val MAX_CHAPTER_BYTES: Int = 8 * 1024 * 1024
     const val MAX_TOTAL_CHARS: Int = 8_000_000
     const val MAX_SPINE_ITEMS: Int = 2_000
+
+    /** 单张插图解压上限：超过就当作畸形文件跳过，不把内存交给它。 */
+    const val MAX_PICTURE_BYTES: Int = 8 * 1024 * 1024
+
+    /** 小于这个体积的图基本是项目符号、分隔线、装饰角花，不值得占一页。 */
+    const val MIN_PICTURE_BYTES: Long = 6 * 1024
+
+    /** 全书最多认这么多张插图；再多就不再记（避免漫画类 EPUB 把锚点表撑爆）。 */
+    const val MAX_PICTURES: Int = 600
 }
 
 /**

@@ -57,6 +57,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.galizhajidanbaofan.plainpage.R
 import io.github.galizhajidanbaofan.plainpage.di.AppContainer
 import io.github.galizhajidanbaofan.plainpage.domain.engine.ReaderException
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import io.github.galizhajidanbaofan.plainpage.ui.theme.ReadingFonts
 import io.github.galizhajidanbaofan.plainpage.ui.LocalAppearance
 import io.github.galizhajidanbaofan.plainpage.ui.ReadingMode
 import io.github.galizhajidanbaofan.plainpage.ui.theme.LocalTextStyles
@@ -91,6 +96,7 @@ fun ReaderScreen(
         mode = LocalAppearance.current.readingMode,
         scrollFraction = scrollFraction,
         loadChunk = viewModel::textChunk,
+        loadPictures = viewModel::picturesInChunk,
         onScrollPosition = viewModel::onScrollPosition,
         onFlushScroll = viewModel::flushScrollProgress,
         modifier = modifier,
@@ -118,6 +124,7 @@ internal fun ReaderContent(
     mode: ReadingMode = ReadingMode.PAGED,
     scrollFraction: Float = 0f,
     loadChunk: suspend (Int) -> String = { "" },
+    loadPictures: suspend (Int) -> List<ReaderPicture> = { emptyList() },
     onScrollPosition: (Int, Int) -> Unit = { _, _ -> },
     onFlushScroll: (Int, Int) -> Unit = { _, _ -> },
 ) {
@@ -164,6 +171,7 @@ internal fun ReaderContent(
                         ReadingMode.SCROLL -> ScrollBody(
                             ready = state,
                             loadChunk = loadChunk,
+                            loadPictures = loadPictures,
                             onScrollPosition = onScrollPosition,
                             onFlushScroll = onFlushScroll,
                         )
@@ -364,10 +372,27 @@ private fun indentParagraphs(text: String): String = text.lineSequence().joinToS
 }
 
 /**
+ * 翻页模式的一屏快照。
+ *
+ * 为什么要把这一屏的所有内容打成快照再交给 `AnimatedContent`：如果动画里直接读外层的
+ * `ready`，翻页动画的两端会一起变成"新的一屏"，退场的那一屏就没了——看起来像硬切。
+ */
+private data class PageSnapshot(
+    val index: Int,
+    val text: String,
+    val picture: ImageBitmap?,
+    val caption: String?,
+    val lossyHint: Boolean,
+)
+
+/**
  * 翻页模式的正文：一屏一窗口，左右轻点或左右滑动翻页。
  *
  * 上下滑动**故意不接**：这个模式里没有可滚动的内容，
  * 竖向手势留给系统（下拉通知栏、返回手势），比自作主张地"滚半页"更符合直觉。
+ *
+ * EPUB 里的插图占一整屏，排在它所属正文屏之后：图片不打断字符窗口，
+ * 所以不会出现"图把正文挤出屏幕"的情况，代价只是图的上下文要往前翻一屏。
  */
 @Composable
 private fun PagedBody(
@@ -377,6 +402,8 @@ private fun PagedBody(
 ) {
     val tokens = LocalThemeTokens.current
     val styles = LocalTextStyles.current
+    val font = LocalAppearance.current.font
+    val bodyStyle = remember(font) { ReadingFonts.apply(styles.readingBody, font) }
     val swipeThreshold = with(LocalDensity.current) { 56.dp.toPx() }
 
     Box(
@@ -389,9 +416,15 @@ private fun PagedBody(
             ),
     ) {
         AnimatedContent(
-            targetState = ready.pageIndex to ready.text,
+            targetState = PageSnapshot(
+                index = ready.pageIndex,
+                text = ready.text,
+                picture = ready.picture,
+                caption = ready.pictureCaption,
+                lossyHint = ready.lossyDecoding,
+            ),
             transitionSpec = {
-                val forward = targetState.first >= initialState.first
+                val forward = targetState.index >= initialState.index
                 val enter = slideInHorizontally(animationSpec = tween(220)) { width ->
                     if (forward) width / 4 else -width / 4
                 } + fadeIn(animationSpec = tween(160))
@@ -401,25 +434,105 @@ private fun PagedBody(
                 enter togetherWith exit
             },
             label = "page-turn",
-        ) { (_, text) ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 26.dp, vertical = 24.dp),
-            ) {
-                if (ready.lossyDecoding) {
-                    Text(
-                        text = stringResource(R.string.reader_lossy),
-                        style = styles.meta,
-                        color = tokens.accent,
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                }
-                Text(
-                    text = indentParagraphs(text),
-                    style = styles.readingBody,
-                    color = tokens.textPrimary,
+        ) { page ->
+            if (page.picture != null) {
+                PicturePage(
+                    picture = page.picture,
+                    caption = page.caption,
+                    style = bodyStyle,
+                    color = tokens.textSecondary,
                 )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 26.dp, vertical = 24.dp),
+                ) {
+                    if (page.lossyHint) {
+                        Text(
+                            text = stringResource(R.string.reader_lossy),
+                            style = styles.meta,
+                            color = tokens.accent,
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+                    Text(
+                        text = indentParagraphs(page.text),
+                        style = bodyStyle,
+                        color = tokens.textPrimary,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 整页插图：等比例缩放到屏内，上下留白居中；底下用图的 alt 当图注（没有就不画）。
+ *
+ * 为什么不给图加边框：纸黑风格里没有"图片框"这种东西，留白就是框。
+ */
+@Composable
+private fun PicturePage(
+    picture: ImageBitmap,
+    caption: String?,
+    style: androidx.compose.ui.text.TextStyle,
+    color: androidx.compose.ui.graphics.Color,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 26.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Image(
+            bitmap = picture,
+            contentDescription = caption,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(picture.width.toFloat() / picture.height.toFloat()),
+        )
+        if (!caption.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(text = caption, style = style, color = color)
+        }
+    }
+}
+
+/**
+ * 一块正文后面可能跟着一两张插图。
+ *
+ * 只在真正滚到这一块时才去解码（`LaunchedEffect(index)`），没滚到的图不会占内存；
+ * 加载失败就什么都不画——插图坏掉不该影响读正文。
+ */
+@Composable
+private fun ChunkPictures(
+    index: Int,
+    loadPictures: suspend (Int) -> List<ReaderPicture>,
+    captionStyle: androidx.compose.ui.text.TextStyle,
+    captionColor: androidx.compose.ui.graphics.Color,
+) {
+    var pictures by remember(index) { mutableStateOf<List<ReaderPicture>>(emptyList()) }
+    LaunchedEffect(index) {
+        pictures = loadPictures(index)
+    }
+    if (pictures.isEmpty()) return
+    Column(modifier = Modifier.fillMaxWidth()) {
+        pictures.forEach { picture ->
+            Spacer(modifier = Modifier.height(18.dp))
+            Image(
+                bitmap = picture.bitmap,
+                contentDescription = picture.caption,
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(picture.bitmap.width.toFloat() / picture.bitmap.height.toFloat()),
+            )
+            if (!picture.caption.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = picture.caption, style = captionStyle, color = captionColor)
             }
         }
     }
@@ -434,11 +547,14 @@ private fun PagedBody(
 private fun ScrollBody(
     ready: ReaderUiState.Ready,
     loadChunk: suspend (Int) -> String,
+    loadPictures: suspend (Int) -> List<ReaderPicture>,
     onScrollPosition: (Int, Int) -> Unit,
     onFlushScroll: (Int, Int) -> Unit,
 ) {
     val tokens = LocalThemeTokens.current
     val styles = LocalTextStyles.current
+    val font = LocalAppearance.current.font
+    val bodyStyle = remember(font) { ReadingFonts.apply(styles.readingBody, font) }
     val chunkCount = ScrollChunkMath.chunkCount(ready.charCount)
     if (chunkCount == 0) {
         ReaderMessage(text = stringResource(R.string.reader_error_empty))
@@ -478,12 +594,20 @@ private fun ScrollBody(
             items = (0 until chunkCount).toList(),
             key = { index, _ -> index },
         ) { index, _ ->
-            ChunkText(
-                index = index,
-                loadChunk = loadChunk,
-                style = styles.readingBody,
-                color = tokens.textPrimary,
-            )
+            Column {
+                ChunkText(
+                    index = index,
+                    loadChunk = loadChunk,
+                    style = bodyStyle,
+                    color = tokens.textPrimary,
+                )
+                ChunkPictures(
+                    index = index,
+                    loadPictures = loadPictures,
+                    captionStyle = styles.meta,
+                    captionColor = tokens.textSecondary,
+                )
+            }
         }
         item { Spacer(modifier = Modifier.height(40.dp)) }
     }

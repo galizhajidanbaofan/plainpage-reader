@@ -28,6 +28,7 @@ internal object EpubFixtures {
         chapters: List<Chapter> = listOf(chapter("第一章 雪夜", "<p>那年冬天来得格外早。</p>", 1)),
         withNcx: Boolean = true,
         withNav: Boolean = false,
+        extraEntries: Map<String, ByteArray> = emptyMap(),
     ): File {
         val opfDir = "OEBPS"
         val manifest = StringBuilder()
@@ -78,6 +79,9 @@ internal object EpubFixtures {
         """.trimIndent().toByteArray()
 
         entries["$opfDir/content.opf"] = opf.toByteArray()
+
+        // 额外文件（插图等）路径相对 OPF 目录，和它们被引用的方式保持一致。
+        extraEntries.forEach { (path, bytes) -> entries["$opfDir/$path"] = bytes }
 
         chapters.forEach { chapter ->
             entries["$opfDir/${chapter.file}"] = """

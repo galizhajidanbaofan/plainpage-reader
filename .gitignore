@@ -50,3 +50,7 @@ desktop.ini
 # ---------- Test fixtures that are too heavy for git ----------
 # 大样本测试文件（>5MB 的 EPUB/TXT/PDF）不入库，见 docs/test-assets.md
 test-assets/local/
+
+# 本地工具链与补丁脚本，绝不入库
+.toolchain/
+patch_*.py

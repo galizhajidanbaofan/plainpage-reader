@@ -240,3 +240,49 @@ BUILD SUCCESSFUL in 1m 11s  # assembleDebug + lintDebug
 - 设备端手势手感（阈值 `56.dp` 是否合适、轻点分区是否顺手）、进出阅读页的转场动画（`slideInHorizontally(w/6)` 进入、整屏宽滑出退出）都**只在 JVM 与离屏截图上验证过**。
 - 滚动模式在 100 MB 级 TXT 上的实际滚动流畅度与内存占用：分块与 LRU 缓存的设计目标是「只渲染看得见的块」，但**没有在真机上量过**。
 - 性能门禁、release 构建、仪器测试：全部未做。
+
+---
+
+# 第五轮实测（界面重设计 + 阅读字体 + EPUB 插图，2026-10-27）
+
+本轮是三条线合并验收：纸黑界面（书架/最近/设置/阅读四屏重写）、内置字体切换、EPUB 插图。三块都只动 UI 与解析层，引擎、目录、进度坐标的旧结论继续有效。
+
+## 1. 命令与结果
+
+```bash
+export JAVA_HOME=<workspace>/.toolchain/jdk21
+export ANDROID_HOME=<workspace>/.toolchain
+export ANDROID_USER_HOME=$ANDROID_HOME/android-home
+export GRADLE_USER_HOME=$ANDROID_HOME/gradle-home
+export JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=<workspace>/.toolchain/tmp
+
+rm -rf app/build/test-results app/build/screenshots
+./gradlew :app:testDebugUnitTest -Proborazzi.test.record=true
+./gradlew :app:assembleDebug :app:lintDebug
+```
+
+结果：
+
+```
+BUILD SUCCESSFUL in 41s     # testDebugUnitTest（顺带产出 13 张截图）
+BUILD SUCCESSFUL in 1m 32s  # assembleDebug + lintDebug
+```
+
+- 单元测试 **151 个全通过，23 个测试类，failures=0 errors=0**。本轮新增 15 例：`PageSlotsTest` 7（无图时一页一屏、图排在自己那页之后、书末的图追加不丢、同页多图按偏移排、空书只剩图屏、页码找回正文屏、越界退回首屏）、`HtmlTextExtractorTest` 新增 4（图不进正文但记位置与说明、`data:`/空 `src` 跳过、`svg` 内 `image` 不算、偏移不越界）、`EpubReaderEngineTest` 新增 3（图能从压缩包取出且路径/说明/偏移正确、不存在的路径返回 null 不抛、无图书返回空列表）、`ReaderScreenshotTest` 新增 1（整页插图版式）。
+- `lintDebug`：**0 errors, 4 warnings**（`NewerVersionAvailable`×2、`GradleDependency`、`ObsoleteSdkInt` 误报），无新增。
+- 产物：**18,052,810 字节（17.22 MiB）**，比上一版多 5.84 MB —— 就是内置楷体 `LXGWWenKaiLite-Regular.ttf`（9.75 MB，压进 APK 后约 5.8 MB）。这是目前包体里最大的一块，已在 README 与许可证台账里记账。
+
+## 2. 本轮新增的坑
+
+| 现象 | 根因 | 处理 |
+|---|---|---|
+| `HtmlTextExtractor.kt` 编译报 `Empty character literal` / `Incorrect character literal` | 用 `'''` 表示单引号字符、用裸私用区字符当占位符，写盘后这几处字面量都坏了 | 字符比较改码点（`quote.code == 0x22 || quote.code == 0x27`），占位符改 `0xE000.toChar()`——不依赖任何转义序列 |
+| 插图两侧多出空行 | 占位符后面紧跟块级标签，`breakLine()` 只认 `\n` 结尾，看到占位符就再补一个换行 | `breakLine()` 把占位符也当作「已换行」 |
+| 引擎 `pictures` 恒为空 | `EpubIndexer` 根本没用 `extracted.images`（提取层做了、索引层没接） | 在压平循环里解析 `src` → 压缩包路径并换算全书偏移 |
+| 测试断言「图的偏移 = 1」 | 自己写错：`ref.at` 是 150，`afterPage` 才是 1 | 断言改成 150 |
+
+## 3. 仍生效的未验证清单
+
+- **真实 EPUB 的插图**没有跑过（测试里的图是现造的 1×1 PNG）：真实书里的 `srcset`、`<picture>`、SVG 封面、灰阶 JPEG 都没覆盖；`<picture>` 只取 `<img>` 的 `src`。
+- 字体切换的手感、宋体/等线/打字机在各厂商 ROM 上是否真的存在（系统字体族缺失时会回落默认），只在 JVM 截图上验证过。
+- 性能门禁、release 构建、仪器测试：全部未做。

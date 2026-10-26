@@ -39,6 +39,35 @@ class EpubReaderEngineTest {
         readingLocation = location,
     )
 
+
+    /** 1x1 的合法 PNG：拿来验"能不能从压缩包里取出来解码"。 */
+    private fun pngBytes(): ByteArray = java.util.Base64.getDecoder().decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    )
+
+    /** 带一张插图的 EPUB：正文两段，图挂在第一段之后。 */
+    private fun fixtureWithImage(): File = EpubFixtures.build(
+        temp.root,
+        chapters = listOf(
+            EpubFixtures.chapter(
+                "第一章 雪夜",
+                """<p>甲一，冬天来得早。</p><img src="../Images/snow.png" alt="窗外的雪"/><p>乙二，雪还在下。</p>""",
+                1,
+            ),
+        ),
+        extraEntries = mapOf("Images/snow.png" to pngBytes()),
+    )
+
+    private fun bookWithImage(location: ReadingLocation? = null) = Book(
+        id = 2L,
+        title = "带图的书",
+        format = BookFormat.EPUB,
+        localPath = fixtureWithImage().absolutePath,
+        sourceUri = "content://test/image-book",
+        importedAt = 0L,
+        readingLocation = location,
+    )
+
     @Test
     fun `打开后拿到元信息目录与正文`() = runBlocking {
         val engine = EpubReaderEngine()
@@ -146,5 +175,36 @@ class EpubReaderEngineTest {
         assertEquals(0, engine.charCount)
         assertEquals("", engine.readText(0, 10))
         assertTrue(engine.loadOutline().isEmpty())
+    }
+
+    @Test
+    fun `插图从压缩包里取出来，位置与说明都带上`() = runBlocking {
+        val engine = EpubReaderEngine()
+        engine.open(bookWithImage())
+
+        val pictures = engine.pictures
+        assertEquals(1, pictures.size)
+        val picture = pictures.single()
+        assertEquals("OEBPS/Images/snow.png", picture.path)
+        assertEquals("窗外的雪", picture.alt)
+        assertTrue("偏移应落在正文范围内", picture.at in 0..engine.charCount)
+
+        val bytes = engine.pictureBytes(picture.path)
+        assertNotNull(bytes)
+        assertEquals(pngBytes().size, bytes!!.size)
+    }
+
+    @Test
+    fun `不存在的插图路径返回 null 而不是抛异常`() = runBlocking {
+        val engine = EpubReaderEngine()
+        engine.open(bookWithImage())
+        assertEquals(null, engine.pictureBytes("OEBPS/Images/nothing.png"))
+    }
+
+    @Test
+    fun `没有插图的书写成空列表`() = runBlocking {
+        val engine = EpubReaderEngine()
+        engine.open(book())
+        assertTrue(engine.pictures.isEmpty())
     }
 }

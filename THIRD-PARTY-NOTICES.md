@@ -31,6 +31,14 @@
 | Roborazzi（roborazzi / roborazzi-compose） | `io.github.takahirom.roborazzi:roborazzi:1.77.0`、`roborazzi-compose:1.77.0` | Apache-2.0 | POM 已直接核实 | **testImplementation**（离屏截图，不进 APK） |
 | Compose UI Test（ui-test-junit4 / ui-test-manifest） | 随 Compose BOM `2026.09.00` | Apache-2.0 | Google 官方 androidx 组件 | testImplementation / debugImplementation（不进 release APK） |
 
+### 随应用分发的非代码资源
+
+| 名称 | 来源 / 版本 | 许可证 | 取证 | 位置 |
+|---|---|---|---|---|
+| LXGW WenKai Lite（霞鹜文楷 Lite） | https://github.com/lxgw/LxgwWenKai-Lite ，Release v1.245（`LXGWWenKaiLite-Regular.ttf`，9,752,448 字节，sha256 `f68f9364…`） | **SIL OFL-1.1** | 上游 `OFL.txt` 全文随包保存于 `app/src/main/assets/licenses/OFL-LXGWWenKaiLite.txt`（4,442 字节）；OFL 允许随应用一起分发，要求保留许可证与版权声明、不得单独售卖字体本身 | `app/src/main/res/font/lxgw_wenkai_lite.ttf`（Android 资源目录，`R.font.lxgw_wenkai_lite`） |
+
+> 字体是**资源**不是依赖：不进 Maven 依赖树，但会因为体积与许可证义务被单独记账。OFL-1.1 不是 copyleft，不要求应用本体开源；但它要求衍生字体（改名、改造字形）继续用 OFL，因此本应用**不修改字形**，只原样嵌入。
+
 > Kotlin 定在 **2.3.20** 而非最新的 2.4.x：KSP 当前最新版 `2.3.12` 是面向 Kotlin 2.3.20 构建的，Maven Central 上不存在 `2.4.x` 版本的 KSP。用 2.4.10 时 `:app:kspDebugKotlin` 直接 `ExceptionInInitializerError`。Room 需要 KSP，所以 Kotlin 跟着 KSP 走；等 KSP 跟进 2.4 再升。`lintDebug` 里 3 条 `NewerVersionAvailable` 警告就是这个已知取舍，**不是遗漏**。
 
 > EPL-1.0 说明：JUnit 4 是弱 copyleft，但仅作开发期测试框架、不随产物分发，因此不影响 Apache-2.0 主许可证与对外分发。已限定为 `testImplementation`。若需更干净的许可证面，可换 TestNG（Apache-2.0）。

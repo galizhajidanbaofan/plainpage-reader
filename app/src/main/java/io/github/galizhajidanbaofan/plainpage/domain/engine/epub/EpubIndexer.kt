@@ -1,5 +1,7 @@
 package io.github.galizhajidanbaofan.plainpage.domain.engine.epub
 
+import io.github.galizhajidanbaofan.plainpage.domain.engine.PictureRef
+
 /**
  * 一章在全书正文里的字符区间。
  *
@@ -26,6 +28,8 @@ internal class EpubIndex(
     val chapters: List<EpubChapter>,
     /** 正文超过上限，后面的章节没有读入。 */
     val truncated: Boolean,
+    /** 插图锚点，按 [PictureRef.at] 升序。 */
+    val pictures: List<PictureRef> = emptyList(),
 ) {
     val charCount: Int get() = text.length
 
@@ -53,6 +57,7 @@ internal object EpubIndexer {
 
         val builder = StringBuilder()
         val chapters = ArrayList<EpubChapter>()
+        val pictures = ArrayList<PictureRef>()
         var truncated = false
 
         for (href in pkg.spine) {
@@ -61,7 +66,8 @@ internal object EpubIndexer {
                 break
             }
             val markup = archive.readTextIfPresent(href, EpubLimits.MAX_CHAPTER_BYTES) ?: continue
-            val body = HtmlTextExtractor.extract(markup)
+            val extracted = HtmlTextExtractor.extract(markup)
+            val body = extracted.text
             if (body.isEmpty()) continue
 
             val title = titles[href]
@@ -70,6 +76,20 @@ internal object EpubIndexer {
             val start = builder.length
             builder.append(title.trim()).append('\n')
             builder.append(body)
+            // 图片偏移 = 本章起点 + 标题行长度 + 它在整章文本里的位置。
+            // 解析不出来的引用（绝对 URL、data:、越界的 ../）直接丢：坏引用不该毁掉整本书。
+            val bodyStart = start + title.trim().length + 1
+            val chapterDir = href.substringBeforeLast('/', "")
+            extracted.images.forEach { image ->
+                val path = ZipPaths.resolve(chapterDir, image.src) ?: return@forEach
+                pictures.add(
+                    PictureRef(
+                        at = bodyStart + image.offset.coerceIn(0, body.length),
+                        path = path,
+                        alt = image.alt,
+                    ),
+                )
+            }
             chapters.add(
                 EpubChapter(
                     href = href,
@@ -87,6 +107,11 @@ internal object EpubIndexer {
                 "这本 EPUB 的正文解析不出文字",
             )
         }
-        return EpubIndex(text = builder.toString(), chapters = chapters, truncated = truncated)
+        return EpubIndex(
+            text = builder.toString(),
+            chapters = chapters,
+            truncated = truncated,
+            pictures = pictures,
+        )
     }
 }
