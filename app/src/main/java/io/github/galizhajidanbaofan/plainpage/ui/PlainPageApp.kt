@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -56,9 +57,11 @@ import io.github.galizhajidanbaofan.plainpage.R
 import io.github.galizhajidanbaofan.plainpage.data.importing.ImportRejection
 import io.github.galizhajidanbaofan.plainpage.di.AppContainer
 import io.github.galizhajidanbaofan.plainpage.domain.model.Book
+import io.github.galizhajidanbaofan.plainpage.domain.model.BookFormat
 import io.github.galizhajidanbaofan.plainpage.ui.library.LibraryMessage
 import io.github.galizhajidanbaofan.plainpage.ui.library.LibraryViewModel
 import io.github.galizhajidanbaofan.plainpage.ui.reader.ReaderScreen
+import io.github.galizhajidanbaofan.plainpage.ui.reader.pdf.PdfReaderScreen
 import io.github.galizhajidanbaofan.plainpage.ui.recent.RecentScreen
 import io.github.galizhajidanbaofan.plainpage.ui.settings.SettingsScreen
 import io.github.galizhajidanbaofan.plainpage.ui.shelf.ShelfScreen
@@ -296,11 +299,37 @@ private fun PlainPageNavHost(
             },
         ) { entry ->
             val bookId = entry.arguments?.getLong(ARG_BOOK_ID) ?: return@composable
-            ReaderScreen(
+            ReaderRoute(
                 bookId = bookId,
                 container = container,
                 onBack = { navController.popBackStack() },
             )
         }
+    }
+}
+
+/**
+ * 按格式选阅读页。
+ *
+ * PDF 与 TXT/EPUB 的状态机不同（整页位图 vs 字符窗口），所以入口在这里分岔；
+ * 深链接进来时格式要先查一次库，查之前那一帧只铺纸白，不做加载动画——快得看不见。
+ */
+@Composable
+private fun ReaderRoute(
+    bookId: Long,
+    container: AppContainer,
+    onBack: () -> Unit,
+) {
+    var format by remember(bookId) { mutableStateOf<BookFormat?>(null) }
+    LaunchedEffect(bookId) {
+        format = container.bookRepository.find(bookId)?.format
+    }
+    when (format) {
+        null -> Surface(
+            color = LocalThemeTokens.current.paper,
+            modifier = Modifier.fillMaxSize(),
+        ) {}
+        BookFormat.PDF -> PdfReaderScreen(bookId = bookId, container = container, onBack = onBack)
+        else -> ReaderScreen(bookId = bookId, container = container, onBack = onBack)
     }
 }

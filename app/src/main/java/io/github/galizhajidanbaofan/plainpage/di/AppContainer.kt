@@ -7,6 +7,7 @@ import io.github.galizhajidanbaofan.plainpage.data.local.PlainPageDatabase
 import io.github.galizhajidanbaofan.plainpage.data.repository.RoomBookRepository
 import io.github.galizhajidanbaofan.plainpage.domain.engine.ReaderEngine
 import io.github.galizhajidanbaofan.plainpage.domain.engine.epub.EpubReaderEngine
+import io.github.galizhajidanbaofan.plainpage.domain.engine.pdf.PdfReaderEngine
 import io.github.galizhajidanbaofan.plainpage.domain.engine.txt.TxtReaderEngine
 import io.github.galizhajidanbaofan.plainpage.domain.model.Book
 import io.github.galizhajidanbaofan.plainpage.domain.model.BookFormat
@@ -38,8 +39,9 @@ class AppContainer(context: Context) {
         BookFormat.EPUB -> EpubReaderEngine(
             progressSink = { location, _ -> bookRepository.saveLocation(book.id, location) },
         )
-        // TODO(阶段 4)：PDF 用 Android PdfRenderer 渲染 + 页码进度。
-        BookFormat.PDF -> null
+        BookFormat.PDF -> PdfReaderEngine(
+            progressSink = { location, _ -> bookRepository.saveLocation(book.id, location) },
+        )
     }
 
     val bookImporter: BookImporter by lazy {

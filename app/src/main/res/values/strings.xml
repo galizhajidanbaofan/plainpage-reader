@@ -34,11 +34,16 @@
     <string name="import_reason_empty">文件是空的</string>
     <string name="import_reason_io">写入私有目录失败</string>
 
+    <string name="pdf_kicker">第 %1$d 页 / 共 %2$d 页</string>
+    <string name="pdf_page">第 %1$d 页</string>
+    <string name="pdf_toc_kicker">共 %1$d 页</string>
+    <string name="pdf_current">在此</string>
+    <string name="pdf_rendering">正在排版这一页…</string>
     <string name="reader_toc">目录</string>
     <string name="reader_kicker_chapters">共 %1$d 章</string>
     <string name="reader_toc_percent">%1$d%%</string>
     <string name="reader_lossy">正文可能不完整，或出现无法识别的字符</string>
-    <string name="reader_unsupported">%1$s 阅读引擎还没接入，当前支持 EPUB 与 TXT</string>
+    <string name="reader_unsupported">%1$s 暂不支持</string>
     <string name="reader_error_missing">文件不在了：可能被系统清理，或读取权限已失效</string>
     <string name="reader_error_corrupted">文件损坏或格式不对，打不开</string>
     <string name="reader_error_encoding">编码识别失败，无法解析正文</string>

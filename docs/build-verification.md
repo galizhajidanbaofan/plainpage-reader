@@ -1,7 +1,7 @@
 # 构建验证记录
 
 > 这份文件记录**实际跑过的命令与真实输出**，不是愿望清单。改动构建配置时请更新这里。
-> 最近更新：2026-10-26（EPUB 引擎）。
+> 最近更新：2026-10-27（PDF 引擎）。
 
 ## 1. 本机工具链（构建机实测）
 
@@ -320,3 +320,42 @@ BUILD SUCCESSFUL in 1m 32s  # assembleDebug + lintDebug
 - 修复只在合成 fixture 上验证：真实书里的 `srcset`、`<picture>`、扫描版整页图还没跑过（`<picture>` 只取内层 `<img>` 的 `src`）。
 - `EpubLimits.MIN_PICTURE_BYTES`（6 KB 小图标过滤）目前**未启用**：宁可把一枚装饰图标画成一页，也不想因为体积阈值丢掉真正的插图。这个取舍是临时的。
 - 性能门禁、release 构建、仪器测试：全部未做。
+
+---
+
+# 第七轮实测（PDF 引擎，2026-10-27）
+
+PDF 是 P0 最后一个格式。这一轮没有引入任何新依赖：用平台的 `android.graphics.pdf.PdfRenderer`（API 21+，minSdk 26 直接可用），因此 `gradle/libs.versions.toml` 一行未改。
+
+## 1. 命令与结果
+
+```
+./gradlew --offline app:testDebugUnitTest app:lintDebug app:assembleDebug
+```
+
+- 单元测试 **171 个全通过，26 个测试类，failures=0 errors=0**。本轮新增 12 例：
+  - 新增 `PdfPageMathTest` 8 例（纯算术，跑在 JVM 上）：按屏宽等比算位图尺寸、宽度夹到 2400px 上限、总像素夹到 400 万、比例尺不低于 0.05、非法尺寸（0 宽、负高）不抛异常而是回退、页码夹紧到 `[0, count-1]`、空文档返回 0 页。
+  - 新增 `PdfReaderScreenshotTest` 2 例（Robolectric 原生图形 + Roborazzi）：翻页模式一页铺满 `16-reader-pdf-light.png`、滚动模式连续页 `17-reader-pdf-scroll.png`。真实的 `PdfRenderer` 在 JVM 里没有实现，所以截图喂的是自绘的 A4 位图——**验证的是版式，不是解码**。
+  - 另有 2 例改动在既有文件里：`ReaderScreenshotTest` 的「引擎未接入」用例改成 PDF 占位文案，`reader_unsupported` 只剩非三种格式会走到。
+- `lintDebug`：**0 errors, 4 warnings**（`GradleDependency` ×1、`NewerVersionAvailable` ×2、`ObsoleteSdkInt` ×1），无新增类型。
+  - 中途被 lint 抓到两条新问题，都已修：`PdfReaderScreen` 里在 composition 直接读 `firstVisibleItemIndex`（`FrequentlyChangingValue`）改成快照状态收集；`Bitmap.createBitmap(...)`（`UseKtx`）改成 `androidx.core.graphics.createBitmap(...)`。
+- 产物：**18,146,505 字节（17.31 MiB）**，比上一版只多 421 字节（全是代码，无新资源、无新依赖）。
+
+## 2. 本轮设计上的坑与取舍
+
+| 现象 / 风险 | 处理 |
+|---|---|
+| `PdfRenderer` 不是线程安全的，两个协程同时 `openPage` 会抛 `IllegalStateException` | 引擎内 `Mutex` 串行化渲染；UI 侧的预渲染也走同一个 `renderPage` 入口 |
+| 一页位图可能几 MB，来回翻页反复解码很慢 | 3 张的 `LinkedHashMap` LRU（`accessOrder = true`），只留「上一页 / 当前页 / 下一页」 |
+| 大屏 / 平板按屏宽算出来 3000px 宽会 OOM | `PdfPageMath` 双重夹紧：宽度 ≤ 2400px、总像素 ≤ 400 万；两者取小后再算比例尺 |
+| PDF 页面本身没有背景色，深色主题下是黑的 | 渲染前先把位图清成 `Color.WHITE`，保证纸面永远是纸面 |
+| 滚动模式里页眉不知道该说第几页 | `snapshotFlow { listState.firstVisibleItemIndex }` 汇报可见页，退出时 `onDispose` 才 flush 页码落库（不每滚一像素写一次 Room） |
+| PDF 没有大纲 | P0 按既定决策只做页码跳转：`loadOutline()` 直接产出「第 N 页」条目，目录抽屉即页码表 |
+| 加密 / 损坏 / 非 PDF 文件 | `PdfRenderer` 构造抛异常统一映射成 `ReaderException.Reason.CORRUPTED`，界面给可读提示而不是崩 |
+
+## 3. 仍生效的未验证清单
+
+- **设备端完全没跑过**：`PdfRenderer` 只能在真机/模拟器上用，本机模拟器起不来（见第 3 节），所以「打开真实 PDF、翻页、跳页码、杀进程恢复」全靠代码审查与 JVM 上的算术单测，属于**未验证**。
+- 扫描版大 PDF（50 MB 级）的首开耗时与内存峰值：未测量。
+- 缩放 / 双指手势、文本层抽取、PDF 内链接、大纲：P0 范围外，未做。
+- release 构建与混淆、仪器测试：仍未做。

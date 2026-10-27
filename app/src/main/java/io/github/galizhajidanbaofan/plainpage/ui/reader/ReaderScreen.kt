@@ -269,7 +269,7 @@ internal fun ReaderContent(
 }
 
 @Composable
-private fun ReaderTopBar(
+internal fun ReaderTopBar(
     title: String,
     chapter: String,
     canOpenToc: Boolean,
@@ -339,7 +339,7 @@ private fun ReaderTopBar(
  * 页数对读者没有意义——他要知道的是「还剩多少」，一条线的长度正好回答这个。
  */
 @Composable
-private fun ProgressLine(fraction: Float) {
+internal fun ProgressLine(fraction: Float) {
     val tokens = LocalThemeTokens.current
     Box(
         modifier = Modifier
@@ -638,7 +638,7 @@ private fun ChunkText(
  * `detectTapGestures` 与 `detectHorizontalDragGestures` 各自都要拿第一下触摸的所有权，
  * 叠在一起会出现「滑动被当成点击」或「点击被吞掉」；一次手势里自己判断距离最稳。
  */
-private fun Modifier.pageTurnGestures(
+internal fun Modifier.pageTurnGestures(
     swipeThreshold: Float,
     onPrev: () -> Unit,
     onNext: () -> Unit,
@@ -673,7 +673,7 @@ private fun Modifier.pageTurnGestures(
 }
 
 @Composable
-private fun ReaderMessage(text: String, modifier: Modifier = Modifier) {
+internal fun ReaderMessage(text: String, modifier: Modifier = Modifier) {
     val tokens = LocalThemeTokens.current
     val styles = LocalTextStyles.current
     Column(
@@ -697,7 +697,7 @@ private fun ReaderMessage(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun failureText(reason: ReaderException.Reason): String = when (reason) {
+internal fun failureText(reason: ReaderException.Reason): String = when (reason) {
     ReaderException.Reason.FILE_MISSING -> stringResource(R.string.reader_error_missing)
     ReaderException.Reason.CORRUPTED -> stringResource(R.string.reader_error_corrupted)
     ReaderException.Reason.UNSUPPORTED_ENCODING -> stringResource(R.string.reader_error_encoding)

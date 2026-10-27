@@ -131,6 +131,25 @@ EPUB 的坐标本来是「href + 章内位置」，阅读页只有一套翻页�
 
 这套设计的代价是「图的上下文要往前翻一屏」，收益是任何一屏都不会被图挤爆，而且图片坏掉不影响读正文。
 
+### PDF：一张位图一页，独立状态机
+
+PDF 和 TXT/EPUB 没有共同的可读结构：它没有「字符偏移」，只有「第几页 + 页内比例」；渲染一页是几张 MB 的位图，不是几十 KB 的字符串。所以 PDF 不去套字符窗口那套骨架，而是并行一套：
+
+| 层 | 文件 | 职责 |
+|---|---|---|
+| 引擎 | `domain/engine/pdf/PdfReaderEngine.kt` | 打开 `PdfRenderer`（`ParcelFileDescriptor` 只读），暴露 `pageCount` / `aspectOf` / `renderPage` / `close`；渲染串行化（`Mutex`），已渲染页进 3 张的 LRU 位图缓存 |
+| 纯算术 | `domain/engine/pdf/PdfPageMath.kt` | `bitmapSize(pageWidth, pageHeight, targetWidthPx)`：按屏宽等比例算位图尺寸，宽度不超 2400px、总像素不超 400 万（中端机的位图内存红线），比例尺不低于 0.05；`clampPage(page, count)` 夹紧页码 |
+| 状态机 | `ui/reader/pdf/PdfReaderViewModel.kt` | `Loading / Ready(pageIndex, pageCount, image, aspect) / Failed(reason)`；翻页、页码跳转、滚动落库、退出时 flush 页码；同样 300ms 防抖 |
+| 界面 | `ui/reader/pdf/PdfReaderScreen.kt` | 两种模式共用同一份状态：翻页模式一次渲染一页（`ContentScale.Fit`，纸白底），滚动模式 `LazyColumn` 每页一项、只解码可见页；页码目录抽屉（P0 不做 PDF 大纲，见下） |
+
+几个刻意的取舍：
+
+- **不进 `ReaderEngine` 的 render/flow 抽象**：`ReaderEngine` 的 `render/flow` 签名是围绕字符窗口和 `PictureSource` 设计的，强行复用会让两边都被迫变形；PDF 只复用 `ReaderEngine` 的 `open / close / loadOutline / restoreProgress / saveProgress` 这半边契约（PDF 的 `loadOutline` 产出的就是「第 N 页」条目）。
+- **背面清成纸白**：PDF 页面本身通常没有背景色，`renderPage` 先把位图填 `Color.WHITE` 再渲染，否则深色主题下会看到黑底上的透明页。
+- **没有大纲**：P0 按用户决定只做页码跳转（PDF 大纲解析要么引 PdfBox，要么自研一套对象解析器，包体与工期都不划算）。目录抽屉里的每一项就是「第 N 页」。
+- **不做文字层**：P0 不抽文本、不选中、不搜索；PDF 的进度只有页码与页内比例，够用且不会因为文本层缺失而失真。
+- **内存**：一页位图按屏宽等比例算（手机竖屏通常 1080×1500 左右），加 3 张缓存与预渲染相邻页，峰值在 20–40 MB 量级；再大的 PDF 也不整本载入，`PdfRenderer` 是按需打开页的。
+
 ## 为什么不引这些依赖
 
 | 依赖 | 结论 | 原因 |

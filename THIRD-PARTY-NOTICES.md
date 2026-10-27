@@ -43,6 +43,8 @@
 
 > EPL-1.0 说明：JUnit 4 是弱 copyleft，但仅作开发期测试框架、不随产物分发，因此不影响 Apache-2.0 主许可证与对外分发。已限定为 `testImplementation`。若需更干净的许可证面，可换 TestNG（Apache-2.0）。
 
+> **PDF 没有第三方依赖**：PDF 渲染用平台的 `android.graphics.pdf.PdfRenderer`（AOSP，Apache-2.0，随 Android 系统提供，不打包进 APK）。P0 不引 PdfBox-Android，理由见「三、已评估并放弃引入」。
+
 ## 二、计划引入（引入时逐项复核版本与传递依赖）
 
 | 名称 | 用途 | 预期许可证 | 传递依赖风险 |
