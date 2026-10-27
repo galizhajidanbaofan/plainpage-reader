@@ -31,7 +31,11 @@ internal data class ExtractedImage(
  */
 internal object HtmlTextExtractor {
 
-    private val SKIP_TAGS = setOf("script", "style", "head", "title", "meta", "link", "svg", "iframe", "object")
+    // 注意：这里不能把 "svg" 放进跳过集合。EPUB3（以及大量 EPUB2）的封面与插图
+    // 是 `<svg><image xlink:href="..."/></svg>` 的写法，整棵 svg 跳过等于把图也跳过，
+    // 结果就是"书能开、字能读、图一张都没有"。
+    // 但 svg 里的 <text> 是矢量文字（常用来排版封面标题），不该混进正文。
+    private val SKIP_TAGS = setOf("script", "style", "head", "title", "meta", "link", "iframe", "object", "text")
 
     private val BLOCK_TAGS = setOf(
         "p", "div", "br", "li", "ul", "ol", "dl", "dt", "dd", "tr", "table", "thead", "tbody",
@@ -92,7 +96,9 @@ internal object HtmlTextExtractor {
                 }
                 if (skipDepth > 0) continue
                 if (name == "img" || name == "image") {
-                    val src = attribute(rawTag, "src") ?: attribute(rawTag, "href")
+                    // `<image>` 基本只出现在 SVG 里，用的是 xlink:href / href；`<img>` 用的是 src。
+                    // 两个都试，是因为现实文件里两种写法都见过（尤其转换工具产出的畸形文档）。
+                    val src = attribute(rawTag, "href") ?: attribute(rawTag, "src")
                     if (!src.isNullOrBlank() && !src.startsWith("data:") && !src.startsWith("javascript:")) {
                         images.add(ExtractedImage(src = src, alt = attribute(rawTag, "alt"), offset = -1))
                         out.append(IMAGE_MARK)
@@ -159,8 +165,11 @@ internal object HtmlTextExtractor {
         while (true) {
             index = rawTag.indexOf(name, index, ignoreCase = true)
             if (index < 0) return null
-            // 必须是完整的属性名起点（前一个字符是空白），且后面紧跟 `=`
-            val beforeOk = index == 0 || rawTag[index - 1].isWhitespace()
+            // 必须是完整的属性名起点：前面是空白，或者是命名空间前缀的冒号
+            // （`xlink:href` 去掉前缀后本地名才叫 href，不认冒号就永远取不到 SVG 插图）。
+            val beforeOk = index == 0 ||
+                rawTag[index - 1].isWhitespace() ||
+                rawTag[index - 1] == ':'
             var cursor = index + name.length
             while (cursor < rawTag.length && rawTag[cursor].isWhitespace()) cursor++
             if (beforeOk && cursor < rawTag.length && rawTag[cursor] == '=') {

@@ -20,6 +20,8 @@ internal data class EpubPackageInfo(
     val spine: List<String>,
     val ncxPath: String?,
     val navPath: String?,
+    /** OPF 声明的封面图路径（可能为 null：很多书封面只在 guide 里，甚至完全没有）。 */
+    val coverImage: String? = null,
 )
 
 /** container.xml：EPUB 里唯一"位置固定"的文件，指向真正的 OPF。 */
@@ -98,6 +100,23 @@ internal object EpubPackageParser {
             item.properties.split(' ').any { it.equals("nav", ignoreCase = true) }
         }?.path
 
+        // 封面图有三种声明方式，按可靠程度排序：EPUB3 的 properties="cover-image"、
+        // EPUB2 的 <meta name="cover" content="id"/>、老式 guide 里的 <reference type="cover"/>。
+        // 封面图通常不出现在任何正文 XHTML 里，只从正文找图的话，封面永远不会显示。
+        val coverImage = manifest
+            .firstOrNull { item -> item.properties.split(' ').any { it.equals("cover-image", true) } }
+            ?.path
+            ?: document.elements("meta")
+                .firstOrNull { it.attribute("name")?.equals("cover", true) == true }
+                ?.attribute("content")
+                ?.let(byId::get)
+                ?.path
+            ?: document.elements("reference")
+                .firstOrNull { it.attribute("type")?.equals("cover", true) == true }
+                ?.attribute("href")
+                ?.let { ZipPaths.resolve(baseDir, it) }
+                ?.takeIf(::looksLikeImage)
+
         return EpubPackageInfo(
             packagePath = packagePath,
             baseDir = baseDir,
@@ -108,8 +127,17 @@ internal object EpubPackageParser {
             spine = spine,
             ncxPath = ncxPath,
             navPath = navPath,
+            coverImage = coverImage?.takeIf(::looksLikeImage),
         )
     }
+
+    /** guide 的 cover 有时指向 cover.xhtml 而不是图片本身，这种不要当插图用。 */
+    private fun looksLikeImage(path: String): Boolean {
+        val lower = path.lowercase()
+        return IMAGE_EXTENSIONS.any { lower.endsWith(it) }
+    }
+
+    private val IMAGE_EXTENSIONS = listOf(".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp")
 
     private const val NCX_MEDIA_TYPE = "application/x-dtbncx+xml"
 }

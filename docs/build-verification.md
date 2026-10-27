@@ -286,3 +286,37 @@ BUILD SUCCESSFUL in 1m 32s  # assembleDebug + lintDebug
 - **真实 EPUB 的插图**没有跑过（测试里的图是现造的 1×1 PNG）：真实书里的 `srcset`、`<picture>`、SVG 封面、灰阶 JPEG 都没覆盖；`<picture>` 只取 `<img>` 的 `src`。
 - 字体切换的手感、宋体/等线/打字机在各厂商 ROM 上是否真的存在（系统字体族缺失时会回落默认），只在 JVM 截图上验证过。
 - 性能门禁、release 构建、仪器测试：全部未做。
+
+# 第六轮实测（真实 EPUB 插图不显示的三个根因修复，2026-10-27）
+
+用户反馈：真实书籍「书能打开、字能读，但一张图都没有」。合成 fixture 全部通过，说明测试覆盖的是理想写法。
+本轮按真实 EPUB 的三种常见写法逐条修复，并补回归用例。
+
+## 1. 命令与结果
+
+```
+./gradlew --offline app:testDebugUnitTest app:lintDebug app:assembleDebug
+```
+
+- 单元测试 **159 个全通过，24 个测试类，failures=0 errors=0**。本轮新增/改写 8 例：
+  - 新增 `EpubImageRegressionTest` 5 例：`<svg><image xlink:href>` 被识别、zip 条目大小写不一致仍能取到字节、OPF `cover-image` 成为第一张图且偏移 0、正文已引封面时不重复插、EPUB2 `<meta name="cover">` 能找到封面；
+  - 改写 `HtmlTextExtractorTest` 2 例：原先断言的「svg 整段跳过」「svg 内 image 不算插图」正是 bug 本身，改成「svg 里的矢量文字不进正文，但 image 必须被识别」；
+  - 新增 `PageSlotsTest` 1 例：偏移 0 的封面排在第一页正文之前（`BEFORE_FIRST_PAGE = -1`）。
+- `lintDebug`：**0 errors, 4 warnings**，无新增。
+- 产物：**18,146,084 字节（17.31 MiB）**，比上一版多 93,274 字节（新增代码与资源，无新依赖）。
+
+## 2. 本轮新增的坑
+
+| 现象 | 根因 | 处理 |
+|---|---|---|
+| 真实书里插图全不显示，合成 fixture 全绿 | `SKIP_TAGS` 里含 `svg`，而 EPUB3 封面/插图普遍写成 `<svg><image xlink:href="…"/></svg>`，整棵 svg 被跳过，图也被跳过 | 从 `SKIP_TAGS` 移除 `svg`，改为只跳过 svg 里的 `<text>` |
+| `xlink:href` 取不到值 | `attribute()` 要求属性名前一个字符是空白，`xlink:href` 前面是冒号 | 属性名边界加上 `:` |
+| 封面明明在 OPF 里却不显示 | 封面通常不被任何正文 XHTML 引用，索引器只从正文找图 | `EpubPackageParser` 读 `cover-image` / `meta cover` / guide，`EpubIndexer` 补一张 `at = 0` 的图并去重 |
+| 大小写不一致时读不到图 | `ZipPaths` 只做精确匹配，`COVER.JPG` 与 `Cover.jpg` 不等 | `EpubArchive` 增加小写兜底表 |
+| 小写兜底表永远是空的，且不报错 | `buildMap { entries.forEach { … } }` 里的 `entries` 被解析成正在构建的那张空表（lambda 接收者的成员遮蔽了类成员） | 显式写 `this@EpubArchive.entries` |
+
+## 3. 仍生效的未验证清单
+
+- 修复只在合成 fixture 上验证：真实书里的 `srcset`、`<picture>`、扫描版整页图还没跑过（`<picture>` 只取内层 `<img>` 的 `src`）。
+- `EpubLimits.MIN_PICTURE_BYTES`（6 KB 小图标过滤）目前**未启用**：宁可把一枚装饰图标画成一页，也不想因为体积阈值丢掉真正的插图。这个取舍是临时的。
+- 性能门禁、release 构建、仪器测试：全部未做。

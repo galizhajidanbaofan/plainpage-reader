@@ -101,7 +101,7 @@ EPUB 的坐标本来是「href + 章内位置」，阅读页只有一套翻页�
 
 1. `EpubArchive` 打开 ZIP，只认 `mimetype`/`META-INF/container.xml`；
 2. `EpubPackageParser` 解 OPF：`dc:title`、`dc:creator`、manifest、spine（`linear="no"` 跳过）；
-3. 按 spine 顺序逐章读 XHTML，`HtmlTextExtractor` 去掉标签（跳过 `head`/`script`/`style`/`svg`，块级标签换行，实体解码），拼成全书文本并记录每章 `[charStart, charEnd)`；同时把 `<img>` 的 `src`/`alt` 与「本该出现在第几个字之间」记下来，留给插图用；
+3. 按 spine 顺序逐章读 XHTML，`HtmlTextExtractor` 去掉标签（跳过 `head`/`script`/`style`/`iframe`/`object` 与 svg 里的 `<text>`，块级标签换行，实体解码），拼成全书文本并记录每章 `[charStart, charEnd)`；同时把 `<img>` / `<image>` 的地址、`alt` 与「本该出现在第几个字之间」记下来，留给插图用；
 4. `EpubOutlineParser` 取目录：NCX → EPUB3 `nav[epub:type=toc]` → spine 文件名兜底；
 5. 进度双向换算：`positionOf(offset)` 给出 `ReadingLocation.Epub(href, 章内百分比)`，`charOffsetOf(locator)` 换回全书偏移。
 
@@ -120,11 +120,14 @@ EPUB 的坐标本来是「href + 章内位置」，阅读页只有一套翻页�
 
 图片如果直接塞进正文流，那一屏的字符窗口就会被图挤爆（窗口是定长字符，多出来的正文会被裁掉）。所以走「锚点」：
 
-1. `HtmlTextExtractor` 扫到 `<img>` 时在输出里留一个私用区占位符，把 `src`/`alt` 记进 `ExtractedImage`，归一化时再把占位符换成「它在纯文本里的字符下标」；`data:` / `javascript:` / 空 `src` 直接跳过；`<svg>` 内部的 `<image>` 不算图（`svg` 整段跳过）。
-2. `EpubIndexer` 把 `src` 相对所在章目录解析成压缩包内绝对路径（`ZipPaths.resolve`，越界 `..` 直接丢），偏移换算成全书坐标 `bodyStart + offset`，得到 `PictureRef(at, path, alt)`。
-3. 翻页模式：`PageSlots.build` 把「正文屏」和「插图纸」排成一条序列——偏移落在某页窗口内的图排在该页之后，落在书末的图追加在最后，**永不丢图**；图屏 → `PicturePage`（等比例 `ContentScale.Fit` + 图注）。
-4. 滚动模式：`ChunkPictures` 在所属块之后渲染，`LaunchedEffect(chunkIndex)` 懒加载，没滚到的图不解码。
-5. 解码：`EpubReaderEngine.pictureBytes(path)` 读原始字节（`EpubLimits.MAX_PICTURE_BYTES` 上限）→ `BitmapFactory` 先只读尺寸再按 `inSampleSize` 降到约 1600px 解码，4 张的 LRU 缓存；解不出来就当这一屏没有图、退回该位置正文，绝不留白屏。
+1. `HtmlTextExtractor` 扫到 `<img>` 时在输出里留一个私用区占位符，把 `src`/`alt` 记进 `ExtractedImage`，归一化时再把占位符换成「它在纯文本里的字符下标」；`data:` / `javascript:` / 空地址直接跳过。
+   - `<img>` 走 `src`，`<image>` 走 `href` / `xlink:href`——EPUB3 的封面和大量插图是 `<svg><image xlink:href="…"/></svg>` 包起来的，所以 **`svg` 不能整体跳过**，只跳过它里面的 `<text>`（矢量文字）。
+2. `EpubIndexer` 把地址相对所在章目录解析成压缩包内绝对路径（`ZipPaths.resolve`，含百分号解码，越界 `..` 直接丢），偏移换算成全书坐标 `bodyStart + offset`，得到 `PictureRef(at, path, alt)`。
+3. 封面单独补一张：OPF 的 `properties="cover-image"` → `<meta name="cover">` → guide 的 `<reference type="cover">`（只要指向的是图片）。封面通常**不出现在任何正文 XHTML 里**，只从正文找图的话封面永远不显示；正文已经引过同一张图时不重复插，且封面排在正文第一页之前（`PageSlots.BEFORE_FIRST_PAGE`）。
+4. 取图时大小写兜底：href 写 `COVER.JPG`、条目叫 `Cover.jpg` 是跨平台打包的常见坑，`EpubArchive` 先精确匹配、再按小写匹配一次。
+5. 翻页模式：`PageSlots.build` 把「正文屏」和「插图纸」排成一条序列——偏移落在某页窗口内的图排在该页之后，落在书末的图追加在最后，**永不丢图**；图屏 → `PicturePage`（等比例 `ContentScale.Fit` + 图注）。
+6. 滚动模式：`ChunkPictures` 在所属块之后渲染，`LaunchedEffect(chunkIndex)` 懒加载，没滚到的图不解码。
+7. 解码：`EpubReaderEngine.pictureBytes(path)` 读原始字节（`EpubLimits.MAX_PICTURE_BYTES` 上限）→ `BitmapFactory` 先只读尺寸再按 `inSampleSize` 降到约 1600px 解码，4 张的 LRU 缓存；解不出来就当这一屏没有图、退回该位置正文，绝不留白屏。
 
 这套设计的代价是「图的上下文要往前翻一屏」，收益是任何一屏都不会被图挤爆，而且图片坏掉不影响读正文。
 

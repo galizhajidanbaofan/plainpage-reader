@@ -4,6 +4,7 @@ import io.github.galizhajidanbaofan.plainpage.domain.engine.txt.TextEncodingDete
 import java.io.Closeable
 import java.io.File
 import java.io.IOException
+import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 
@@ -32,16 +33,28 @@ internal class EpubArchive(private val file: File) : Closeable {
         }
     }
 
+    /** 小写路径 → 条目。真实 EPUB 里 href 写 `Cover.JPG`、zip 条目叫 `cover.jpg` 的事很常见。 */
+    private val lowercase: Map<String, ZipEntry> = buildMap {
+        // 必须显式限定 `this@EpubArchive.entries`：buildMap 的 lambda 接收者本身是个 MutableMap，
+        // 裸写 `entries` 会解析成「正在构建的这张空表」而不是类里的条目表，
+        // 结果小写表永远是空的——图还是取不到，而且编译期一点提示都没有。
+        this@EpubArchive.entries.forEach { (path, entry) -> putIfAbsent(path.lowercase(Locale.ROOT), entry) }
+    }
+
     val entryCount: Int get() = entries.size
 
-    fun contains(path: String): Boolean = entries.containsKey(path)
+    /** 先精确匹配；对不上再按小写试一次。两次都找不到才算缺文件。 */
+    private fun entryFor(path: String): ZipEntry? =
+        entries[path] ?: lowercase[path.lowercase(Locale.ROOT)]
+
+    fun contains(path: String): Boolean = entryFor(path) != null
 
     /** 条目声明的大小；不存在返回 null。用来在解压前筛掉明显是项目符号的小图。 */
-    fun sizeOf(path: String): Long? = entries[path]?.size
+    fun sizeOf(path: String): Long? = entryFor(path)?.size
 
     /** 不存在返回 null；超过 [maxBytes] 视为异常文件，抛 TOO_LARGE 而不是硬读。 */
     fun readBytesIfPresent(path: String, maxBytes: Int): ByteArray? {
-        val entry = entries[path] ?: return null
+        val entry = entryFor(path) ?: return null
         if (entry.size > maxBytes) {
             throw EpubFormatException(
                 EpubFormatException.Kind.TOO_LARGE,

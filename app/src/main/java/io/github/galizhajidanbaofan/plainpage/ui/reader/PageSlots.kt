@@ -17,14 +17,19 @@ object PageSlots {
         /** 正文屏，[startChar] 是这一屏在全书文本里的起始偏移。 */
         data class Text(val startChar: Int, val page: Int) : Slot
 
-        /** 插图屏，插在 [afterPage] 这一页之后。 */
+        /** 插图屏，插在 [afterPage] 这一页之后；[BEFORE_FIRST_PAGE] 表示排在第一页正文之前。 */
         data class Picture(val ref: PictureRef, val afterPage: Int) : Slot
     }
+
+    /** [Slot.Picture.afterPage] 取这个值表示「排在第一页正文之前」（典型是封面）。 */
+    const val BEFORE_FIRST_PAGE: Int = -1
 
     /**
      * 把插图和正文屏排成一条时间线。
      *
      * [pictures] 必须按字符偏移升序；偏移落在某页窗口内的图，排在该页之后。
+     * 偏移为 0 的图（典型是 OPF 里声明的封面）排在第一页正文之前——
+     * 打开书先看到封面，符合阅读器惯例，也不占用正文页。
      * 落在最后一页之后的图依次追加到末尾，不会丢。
      */
     fun build(
@@ -34,13 +39,17 @@ object PageSlots {
         startOfPage: (Int) -> Int,
     ): List<Slot> {
         if (pageCount <= 0) {
-            return pictures.map { Slot.Picture(it, 0) }
+            return pictures.map { Slot.Picture(it, BEFORE_FIRST_PAGE) }
         }
         if (pictures.isEmpty()) {
             return (0 until pageCount).map { Slot.Text(startOfPage(it), it) }
         }
         val result = ArrayList<Slot>(pageCount + pictures.size)
         var cursor = 0
+        while (cursor < pictures.size && pictures[cursor].at <= 0) {
+            result.add(Slot.Picture(pictures[cursor], BEFORE_FIRST_PAGE))
+            cursor++
+        }
         for (page in 0 until pageCount) {
             val start = startOfPage(page)
             result.add(Slot.Text(start, page))

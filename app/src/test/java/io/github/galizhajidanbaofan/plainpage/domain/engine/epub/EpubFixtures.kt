@@ -28,6 +28,8 @@ internal object EpubFixtures {
         chapters: List<Chapter> = listOf(chapter("第一章 雪夜", "<p>那年冬天来得格外早。</p>", 1)),
         withNcx: Boolean = true,
         withNav: Boolean = false,
+        /** 相对 OPF 目录的封面图路径；给了就按 EPUB3 的 properties="cover-image" 声明。 */
+        coverEntry: String? = null,
         extraEntries: Map<String, ByteArray> = emptyMap(),
     ): File {
         val opfDir = "OEBPS"
@@ -45,6 +47,11 @@ internal object EpubFixtures {
         if (withNav) {
             manifest.appendLine(
                 """    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>""",
+            )
+        }
+        if (coverEntry != null) {
+            manifest.appendLine(
+                """    <item id="cover-image" href="$coverEntry" media-type="image/jpeg" properties="cover-image"/>""",
             )
         }
 

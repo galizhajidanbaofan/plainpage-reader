@@ -57,11 +57,14 @@ class HtmlTextExtractorTest {
     }
 
     @Test
-    fun `svg 内容整段跳过`() {
-        val markup = "<p>前</p><svg><text>图形文字</text></svg><p>后</p>"
-        val text = HtmlTextExtractor.extract(markup).text
-        assertEquals("前\n后", text)
-        assertFalse(text.contains("图形文字"))
+    fun `svg 里的矢量文字不进正文，但整棵 svg 不再被跳过`() {
+        // 以前这段断言的是「整棵 svg 被跳过」——那恰好就是真机上插图不显示的原因，
+        // 所以断言改成：矢量文字照旧不要，但图必须能被识别。
+        val markup = "<p>前</p><svg><text>图形文字</text><image href=\"a.png\"/></svg><p>后</p>"
+        val result = HtmlTextExtractor.extract(markup)
+        assertEquals("前\n后", result.text)
+        assertFalse(result.text.contains("图形文字"))
+        assertEquals("svg 里的 image 必须被当成插图", 1, result.images.size)
     }
 
     @Test
@@ -97,11 +100,13 @@ class HtmlTextExtractorTest {
     }
 
     @Test
-    fun `svg 内部的 image 不算插图`() {
+    fun `svg 内部的 image 算插图，xlink href 也认`() {
         val result = HtmlTextExtractor.extract(
-            """<p>甲</p><svg><image href="a.png"/></svg><p>乙</p>""",
+            "<p>甲</p><svg xmlns:xlink=\"http://www.w3.org/1999/xlink\">" +
+                "<image xlink:href=\"../Images/snow.jpg\"/></svg><p>乙</p>",
         )
-        assertTrue(result.images.isEmpty())
+        assertEquals(1, result.images.size)
+        assertEquals("../Images/snow.jpg", result.images.single().src)
     }
 
     @Test

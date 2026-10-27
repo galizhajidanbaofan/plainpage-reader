@@ -33,6 +33,16 @@ class PageSlotsTest {
     }
 
     @Test
+    fun `偏移为 0 的封面排在第一页正文之前`() {
+        val slots = PageSlots.build(2, 100, listOf(picture(0))) { page -> page * 100 }
+        assertEquals(3, slots.size)
+        val cover = slots.first() as PageSlots.Slot.Picture
+        assertEquals(0, cover.ref.at)
+        assertEquals(PageSlots.BEFORE_FIRST_PAGE, cover.afterPage)
+        assertEquals(0, (slots[1] as PageSlots.Slot.Text).page)
+    }
+
+    @Test
     fun `落在最后一页之后的插图追加在末尾，不丢`() {
         val slots = PageSlots.build(2, 100, listOf(picture(500))) { page -> page * 100 }
         assertEquals(3, slots.size)

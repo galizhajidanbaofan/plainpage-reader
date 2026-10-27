@@ -107,11 +107,22 @@ internal object EpubIndexer {
                 "这本 EPUB 的正文解析不出文字",
             )
         }
+
+        // 封面图通常只写在 OPF 里，任何正文 XHTML 都不引用它；不单独补一张，封面就永远不显示。
+        // 正文里已经引用过同一张图时不重复插（有的书第一页就是封面，会引两遍）。
+        val cover = pkg.coverImage
+        if (cover != null &&
+            pictures.size < EpubLimits.MAX_PICTURES &&
+            pictures.none { it.path.equals(cover, ignoreCase = true) }
+        ) {
+            pictures.add(0, PictureRef(at = 0, path = cover, alt = pkg.title))
+        }
+
         return EpubIndex(
             text = builder.toString(),
             chapters = chapters,
             truncated = truncated,
-            pictures = pictures,
+            pictures = pictures.take(EpubLimits.MAX_PICTURES),
         )
     }
 }
