@@ -359,3 +359,57 @@ PDF 是 P0 最后一个格式。这一轮没有引入任何新依赖：用平台
 - 扫描版大 PDF（50 MB 级）的首开耗时与内存峰值：未测量。
 - 缩放 / 双指手势、文本层抽取、PDF 内链接、大纲：P0 范围外，未做。
 - release 构建与混淆、仪器测试：仍未做。
+
+---
+
+# 第八轮实测（书架封面 + 删除打字机字体 + 退出动画右滑 + 真实 EPUB 验收，2026-10-27）
+
+## 1. 命令与结果
+
+```bash
+rm -rf app/build/test-results
+./gradlew --offline app:testDebugUnitTest app:lintDebug app:assembleDebug
+```
+
+- **BUILD SUCCESSFUL**（clean 之后首跑约 1 分钟，增量 24s）。
+- 单元测试：**178 个 / 27 个类，0 失败**（`app/build/test-results/testDebugUnitTest/*.xml` 聚合统计）。比上一轮 171 个多 7 个：`CoverStoreTest` 5 例、`EpubPackageParserTest` 新增 meta cover 两例（按 id 解析、id 指向不存在项不崩）；同时把 `readerTypewriterFont` 换成 `readerDengFont`，截图数不变。
+- `lintDebug`：**0 errors / 4 warnings**（`GradleDependency`×1、`NewerVersionAvailable`×2、`ObsoleteSdkInt`×1）。修掉了本轮新引入的两条：`ModifierParameter`（`ShelfScreen` 的 `modifier` 提到第一个可选参数位）、`UseKtx`（`CoverStore` 里 `Bitmap.createScaledBitmap` 换成 `decoded.scale`）。
+- 产物：**18,137,290 字节（17.30 MiB）**，比 PDF 那版少 9,215 字节（删掉打字机分支与若干代码，无新资源）。
+
+### 真实 EPUB 验收（用户提供的样本）
+
+样本：`恋入膏肓 (斜线堂有纪).epub`，349,148 字节、18 个 ZIP 条目、**全书只有 1 张图**（`OEBPS/Images/9784049130829_1_7.png`，198,124 字节），OPF 用 EPUB2 的 `<meta name="cover" content="x9784049130829_1_7.png"/>`，其中 content 是 manifest 的 **item id** 而不是 href；这张图不被任何 XHTML/CSS 引用，纯封面。
+
+用临时探针（`RealBookAcceptanceProbe`，验证后删除，样本不进军仓库）跑出的真实输出：
+
+```
+PROBE coverPath=...\book.cover.jpg
+PROBE coverBytes=50667
+PROBE coverSize=400x568
+PROBE engine title=恋入膏肓 chars=110281
+PROBE pictures=1 first=OEBPS/Images/9784049130829_1_7.png
+PROBE pictureBytes=198124
+PROBE pictureDecoded=843x1200
+```
+
+结论：**封面抽取 → 400px JPEG 落盘 → 书架渲染**与**插图识别 → 解码**两条链路在这本真书上闭环；截图 `01-shelf-list-light.png` / `02-shelf-grid-light.png` 里的深墨绿封面就是用同一套 `CoverStore` 走的假封面，版式与真实封面一致。
+
+## 2. 本轮设计上的坑与取舍
+
+| 现象 / 风险 | 处理 |
+|---|---|
+| 封面存哪：单独建一张表还是跟文件走 | 与书同目录派生命中 `<书名>.epub` → `<书名>.cover.jpg`，删书时导出路径即可一并删，不引入索引表与额外迁移 |
+| 封面解码内存：原图 843×1200 直接进书架会反复解码 | `inJustDecodeBounds` 先量宽 → 2 的幂 `inSampleSize` 降采样 → 仍超目标再 `scale` 到宽 400px；`load()` 外层再挂 24 条 LRU |
+| 抽封面失败会不会拖垮导入 | `extractFromEpub` 捕 `IOException`/`RuntimeException` 一律返回 null，导入继续，书架回落纸面占位 |
+| 老书（本轮之前导入的）没有 `coverPath` | `LibraryViewModel.init` 里 `backfillCovers()` 只对 `format == EPUB && coverPath == null` 的书补抽，且放在仓库层 `observeShelf().first()` 之后逐本处理 |
+| EPUB2 的 meta cover 的 content 是 manifest id，且 id 常长得像文件名 | 先按 id 查 manifest；查不到再当 href 相对 OPF 目录拼接。单测里刻意让 id（`cover-x1`）与文件名（`Images/cover.png`）不同 |
+| Robolectric 里 `Paint.measureText` 返回 0 | 截图用的假封面只 `drawText` 不量宽度；真机不受影响 |
+| 退出动画原来带 `scaleOut`，像被"弹"回去 | 只保留 `slideOutHorizontally`（260ms）+ 40ms 延后的 `fadeOut`；`popEnter` 从 `-width/14` 滑回，去掉缩放 |
+| 阅读页退出方向 | 统一向右滑出（`targetOffsetX = width`），与"翻回书架"的心理模型一致；系统返回键与界面返回共用同一转场 |
+
+## 3. 仍生效的未验证清单
+
+- **设备端完全没跑过**：书架封面的真机解码耗时、滚动列表里 `produceState` 的复用行为、退出动画在低端机上的掉帧，都属于**未验证**（模拟器启动问题见第 3 节）。
+- 抽封面在「封面是 WebP / 带 alpha 的 PNG / CMYK JPEG」上的表现：只在本轮这一本真实书上验证过解 PNG。
+- 扫描版大 PDF、竖排 EPUB、CSS 复杂排版的插图位置：未测量。
+- release 构建与混淆、仪器测试：仍未做。

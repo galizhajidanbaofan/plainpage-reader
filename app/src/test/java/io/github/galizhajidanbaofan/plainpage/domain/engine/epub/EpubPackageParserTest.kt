@@ -60,6 +60,60 @@ class EpubPackageParserTest {
         }
     }
 
+    /**
+     * EPUB2 的老写法：`<meta name="cover" content="封面 item 的 id"/>`。
+     *
+     * 真实书里 content 几乎总是 manifest 的 item id（不是 href），
+     * 而且这个 id 经常长得像文件名（例如 `x9784049130829_1_7.png`）——
+     * 顺手当成 href 去拼路径也能"偶尔凑巧拼对"，所以这里刻意让两者不同。
+     */
+    @Test
+    fun `EPUB2 的 meta cover 按 manifest id 解析成图片路径`() {
+        val file = EpubFixtures.build(
+            temp.root,
+            coverEntry = "Images/cover.png",
+            coverMetaId = "cover-x1",
+            extraEntries = mapOf("Images/cover.png" to ByteArray(16) { 1 }),
+        )
+        EpubArchive(file).use { archive ->
+            val info = EpubPackageParser.read(archive)
+            assertEquals("OEBPS/Images/cover.png", info.coverImage)
+        }
+    }
+
+    @Test
+    fun `meta cover 指向不存在的 id 时不崩且无封面`() {
+        val file = EpubFixtures.build(
+            temp.root,
+            coverEntry = "Images/cover.png",
+            coverMetaId = "cover-x1",
+            extraEntries = mapOf("Images/cover.png" to ByteArray(16) { 1 }),
+        )
+        // 手工把 id 改坏：content 指向一个 manifest 里没有的 id，同时也当不了 href。
+        val broken = java.io.File(temp.root, "broken-${System.nanoTime()}.epub")
+        java.util.zip.ZipFile(file).use { zip ->
+            java.util.zip.ZipOutputStream(broken.outputStream()).use { out ->
+                zip.entries().asSequence().forEach { entry ->
+                    out.putNextEntry(java.util.zip.ZipEntry(entry.name))
+                    val bytes = zip.getInputStream(entry).readBytes()
+                    out.write(
+                        if (entry.name == "OEBPS/content.opf") {
+                            String(bytes, Charsets.UTF_8)
+                                .replace("content=\"cover-x1\"", "content=\"no-such-item\"")
+                                .toByteArray()
+                        } else {
+                            bytes
+                        },
+                    )
+                    out.closeEntry()
+                }
+            }
+        }
+        EpubArchive(broken).use { archive ->
+            assertNull(EpubPackageParser.read(archive).coverImage)
+        }
+    }
+
     @Test
     fun `缺少 container 抛 CORRUPTED`() {
         val file = EpubFixtures.writeZip(temp.root, "nocontainer.epub", mapOf("OEBPS/content.opf" to "<package/>".toByteArray()))

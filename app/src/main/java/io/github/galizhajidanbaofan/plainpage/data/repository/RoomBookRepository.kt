@@ -34,4 +34,6 @@ class RoomBookRepository(private val dao: BookDao) : BookRepository {
 
     override suspend fun saveLocation(id: Long, location: ReadingLocation?) =
         dao.updateReadingLocation(id, location?.let(ReadingLocationCodec::encode))
+
+    override suspend fun setCover(id: Long, coverPath: String?) = dao.updateCover(id, coverPath)
 }

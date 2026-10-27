@@ -22,6 +22,7 @@ data/                    实现层
   local/                 Room：BookEntity / BookDao / PlainPageDatabase
   repository/            RoomBookRepository
   importing/             BookImporter（SAF → 私有目录复制）
+  cover/                 CoverStore（EPUB 封面抽取 → 与书同目录的 .cover.jpg，24 条 LRU）
 
 di/                      AppContainer：手写组合根（不引 Hilt/Koin）
 ```

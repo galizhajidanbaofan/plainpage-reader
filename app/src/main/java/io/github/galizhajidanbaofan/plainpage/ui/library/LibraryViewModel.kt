@@ -6,17 +6,20 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import io.github.galizhajidanbaofan.plainpage.data.cover.CoverStore
 import io.github.galizhajidanbaofan.plainpage.data.importing.BookImporter
 import io.github.galizhajidanbaofan.plainpage.data.importing.ImportRejection
 import io.github.galizhajidanbaofan.plainpage.data.importing.ImportResult
 import io.github.galizhajidanbaofan.plainpage.di.AppContainer
 import io.github.galizhajidanbaofan.plainpage.domain.model.Book
+import io.github.galizhajidanbaofan.plainpage.domain.model.BookFormat
 import io.github.galizhajidanbaofan.plainpage.domain.repository.BookRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -37,7 +40,12 @@ sealed interface LibraryMessage {
 class LibraryViewModel(
     private val bookRepository: BookRepository,
     private val bookImporter: BookImporter,
+    private val coverStore: CoverStore,
 ) : ViewModel() {
+
+    init {
+        backfillCovers()
+    }
 
     val shelf: StateFlow<List<Book>> = bookRepository.observeShelf()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
@@ -65,7 +73,8 @@ class LibraryViewModel(
             for (uri in uris) {
                 when (val result = bookImporter.import(uri)) {
                     is ImportResult.Success -> {
-                        bookRepository.insert(result.book)
+                        val id = bookRepository.insert(result.book)
+                        storeCover(id, result.book)
                         imported++
                     }
 
@@ -96,8 +105,33 @@ class LibraryViewModel(
     fun delete(book: Book) {
         viewModelScope.launch {
             bookRepository.delete(book.id)
+            coverStore.deleteFor(book)
             withContext(Dispatchers.IO) {
                 runCatching { File(book.localPath).delete() }
+            }
+        }
+    }
+
+    /**
+     * 导入后立刻抽封面。失败只是没有封面，不影响这本书能读，
+     * 所以这里既不重试也不报错——书架会自然回退到占位样式。
+     */
+    private suspend fun storeCover(bookId: Long, book: Book) {
+        if (book.format != BookFormat.EPUB) return
+        val coverPath = coverStore.extractFromEpub(File(book.localPath)) ?: return
+        bookRepository.setCover(bookId, coverPath)
+    }
+
+    /**
+     * 老数据的封面补齐：封面功能比导入功能晚上线，早期导入的书 `coverPath` 是空的。
+     * 只在启动时跑一轮，已经有封面或抽不到的直接跳过。
+     */
+    private fun backfillCovers() {
+        viewModelScope.launch {
+            val shelf = bookRepository.observeShelf().first()
+            for (book in shelf) {
+                if (book.format != BookFormat.EPUB || book.coverPath != null) continue
+                storeCover(book.id, book)
             }
         }
     }
@@ -117,7 +151,7 @@ class LibraryViewModel(
 
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                LibraryViewModel(container.bookRepository, container.bookImporter)
+                LibraryViewModel(container.bookRepository, container.bookImporter, container.coverStore)
             }
         }
     }

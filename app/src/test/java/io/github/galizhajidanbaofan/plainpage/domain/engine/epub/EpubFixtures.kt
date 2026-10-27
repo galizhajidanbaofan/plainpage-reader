@@ -30,6 +30,12 @@ internal object EpubFixtures {
         withNav: Boolean = false,
         /** 相对 OPF 目录的封面图路径；给了就按 EPUB3 的 properties="cover-image" 声明。 */
         coverEntry: String? = null,
+        /**
+         * 给了就改用 EPUB2 的 `<meta name="cover" content="...">` 声明封面，
+         * 值是 manifest 的 **item id**（真实书里常见 id 与文件名相同，这里刻意让它不同，
+         * 以免把「按 id 查 manifest」写成「当 href 用」也能蒙混过关）。
+         */
+        coverMetaId: String? = null,
         extraEntries: Map<String, ByteArray> = emptyMap(),
     ): File {
         val opfDir = "OEBPS"
@@ -50,15 +56,22 @@ internal object EpubFixtures {
             )
         }
         if (coverEntry != null) {
-            manifest.appendLine(
-                """    <item id="cover-image" href="$coverEntry" media-type="image/jpeg" properties="cover-image"/>""",
-            )
+            if (coverMetaId != null) {
+                manifest.appendLine(
+                    """    <item id="$coverMetaId" href="$coverEntry" media-type="image/png"/>""",
+                )
+            } else {
+                manifest.appendLine(
+                    """    <item id="cover-image" href="$coverEntry" media-type="image/jpeg" properties="cover-image"/>""",
+                )
+            }
         }
 
         val metadata = buildString {
             appendLine("""  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">""")
             if (title != null) appendLine("""    <dc:title>$title</dc:title>""")
             if (author != null) appendLine("""    <dc:creator>$author</dc:creator>""")
+            if (coverMetaId != null) appendLine("""    <meta name="cover" content="$coverMetaId"/>""")
             appendLine("  </metadata>")
         }
 

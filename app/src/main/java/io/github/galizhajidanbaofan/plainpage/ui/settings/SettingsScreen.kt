@@ -103,7 +103,6 @@ fun SettingsScreen(
                     ReadingFont.SONG to stringResource(R.string.font_song),
                     ReadingFont.KAI to stringResource(R.string.font_kai),
                     ReadingFont.DENG to stringResource(R.string.font_deng),
-                    ReadingFont.TYPEWRITER to stringResource(R.string.font_typewriter),
                 ),
                 selected = appearance.font,
                 onSelected = { onAppearanceChange(appearance.copy(font = it)) },

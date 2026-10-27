@@ -1,6 +1,7 @@
 package io.github.galizhajidanbaofan.plainpage.di
 
 import android.content.Context
+import io.github.galizhajidanbaofan.plainpage.data.cover.CoverStore
 import io.github.galizhajidanbaofan.plainpage.data.importing.BookImporter
 import io.github.galizhajidanbaofan.plainpage.data.importing.booksDirectory
 import io.github.galizhajidanbaofan.plainpage.data.local.PlainPageDatabase
@@ -43,6 +44,9 @@ class AppContainer(context: Context) {
             progressSink = { location, _ -> bookRepository.saveLocation(book.id, location) },
         )
     }
+
+    /** 书架封面缓存：导入时从 EPUB 抽封面，书架只读缩略图。 */
+    val coverStore: CoverStore by lazy { CoverStore(appContext.filesDir) }
 
     val bookImporter: BookImporter by lazy {
         BookImporter(

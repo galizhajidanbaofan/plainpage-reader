@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,11 +40,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -75,11 +81,13 @@ private val PAGE_MARGIN = 22.dp
 fun ShelfScreen(
     layout: ShelfLayout,
     books: List<Book>,
+    modifier: Modifier = Modifier,
+    /** 读书脊上的封面图；返回 null 时用占位样式（TXT/PDF、抽图失败的 EPUB）。 */
+    loadCover: suspend (Book) -> android.graphics.Bitmap? = { null },
     importing: Boolean,
     onImport: (List<android.net.Uri>) -> Unit,
     onOpen: (Book) -> Unit,
     onDelete: (Book) -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val tokens = LocalThemeTokens.current
@@ -111,12 +119,14 @@ fun ShelfScreen(
                 when (layout) {
                     ShelfLayout.LIST -> BookList(
                         books = books,
+                        loadCover = loadCover,
                         onOpen = onOpen,
                         onRequestDelete = { pendingDelete = it },
                     )
 
                     ShelfLayout.GRID -> BookGrid(
                         books = books,
+                        loadCover = loadCover,
                         onOpen = onOpen,
                         onRequestDelete = { pendingDelete = it },
                     )
@@ -192,6 +202,7 @@ private fun ShelfHeader(count: Int, importing: Boolean, onImport: () -> Unit) {
 @Composable
 private fun BookList(
     books: List<Book>,
+    loadCover: suspend (Book) -> android.graphics.Bitmap?,
     onOpen: (Book) -> Unit,
     onRequestDelete: (Book) -> Unit,
 ) {
@@ -203,6 +214,7 @@ private fun BookList(
         items(books, key = { it.id }) { book ->
             BookListRow(
                 book = book,
+                loadCover = loadCover,
                 onOpen = { onOpen(book) },
                 onRequestDelete = { onRequestDelete(book) },
             )
@@ -218,6 +230,7 @@ private fun BookList(
 @Composable
 private fun BookListRow(
     book: Book,
+    loadCover: suspend (Book) -> android.graphics.Bitmap?,
     onOpen: () -> Unit,
     onRequestDelete: () -> Unit,
 ) {
@@ -234,6 +247,7 @@ private fun BookListRow(
     ) {
         BookCover(
             book = book,
+            loadCover = loadCover,
             modifier = Modifier.size(width = 46.dp, height = 62.dp),
         )
         Spacer(modifier = Modifier.width(14.dp))
@@ -314,6 +328,7 @@ private fun BookListRow(
 @Composable
 private fun BookGrid(
     books: List<Book>,
+    loadCover: suspend (Book) -> android.graphics.Bitmap?,
     onOpen: (Book) -> Unit,
     onRequestDelete: (Book) -> Unit,
 ) {
@@ -337,6 +352,7 @@ private fun BookGrid(
             ) {
                 BookCover(
                     book = book,
+                    loadCover = loadCover,
                     monogram = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -376,12 +392,35 @@ private fun BookGrid(
 private fun BookCover(
     book: Book,
     modifier: Modifier = Modifier,
+    loadCover: suspend (Book) -> android.graphics.Bitmap? = { null },
     monogram: Boolean = false,
 ) {
     val tokens = LocalThemeTokens.current
     val styles = LocalTextStyles.current
-    val wash = coverWashFor(book, tokens.coverWash, tokens.accent)
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(3.dp)
+    // 封面解码走 CoverStore 的缓存，挂在 book.id/coverPath 上：换书或封面补齐后重新取一次。
+    val cover by produceState<ImageBitmap?>(
+        initialValue = null,
+        book.id,
+        book.coverPath,
+    ) {
+        value = loadCover(book)?.asImageBitmap()
+    }
+
+    if (cover != null) {
+        // 有真封面就直接铺满：不加边框、不加装饰字，让图自己说话。
+        Image(
+            bitmap = cover!!,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = modifier
+                .clip(shape)
+                .border(1.dp, tokens.divider, shape),
+        )
+        return
+    }
+
+    val wash = coverWashFor(book, tokens.coverWash, tokens.accent)
     Box(
         modifier = modifier
             .border(1.dp, tokens.divider, shape)

@@ -34,16 +34,17 @@
 | EPUB 目录（NCX / nav / spine 兜底）/ 跳章 / 进度恢复 | ✅ | ✅ 通过（含闭环单测） | 未验证 |
 | 导入时读 EPUB 书名与作者 | ✅ | ✅ 通过 | 未验证 |
 | EPUB 内插图（整页显示 + 图注） | ✅ | ✅ 通过 | 未验证 |
-| EPUB 封面（OPF cover-image / meta cover / guide） | ✅ | ✅ 通过 | 未验证 |
-| 阅读字体切换（默认 / 宋体 / 楷体 / 等线 / 打字机） | ✅ | ✅ 通过 | 未验证 |
+| EPUB 封面解析（cover-image / meta cover 按 id / guide） | ✅ | ✅ 通过 | 未验证 |
+| 书架显示封面（导入时抽图存 400px JPEG，缺失回落纸面占位） | ✅ | ✅ 通过（真实书验收） | 未验证 |
+| 阅读字体切换（默认 / 宋体 / 楷体 / 等线） | ✅ | ✅ 通过 | 未验证 |
 | 阅读模式切换：左右翻页（禁纵向）/ 上下滚动（无翻页） | ✅ | ✅ 通过（含手势与分块单测） | 未验证 |
 | 打开 PDF → 按页渲染（平台 PdfRenderer，无新依赖） | ✅ | ✅ 通过 | 未验证 |
 | PDF 页码跳转 / 进度恢复（页码 + 页内比例） | ✅ | ✅ 通过（含页码换算单测） | 未验证 |
 | 性能目标（冷启动 <2s、大文件不 ANR） | 未开始 | — | **未测量** |
 
-已实测（2026-10-27）：`assembleDebug` 产出 **17.31 MiB / 18,146,505 字节** debug APK（其中约 5.8 MB 是内置楷体字体，见下）；**171 个单元测试全通过**（含 17 张离屏截图、TXT 与 EPUB 各自的「存进度→重开→同一屏」闭环、翻页手势的点击/滑动分区、滚动模式的分块换算、插图的提取/落位/整页编排、EPUB 的 ZIP 穿越 / XXE / 超限 / 损坏用例、PDF 的渲染尺寸换算与页码夹紧）；`lintDebug` **0 errors / 4 warnings**（3 条依赖版本提示、1 条自适应图标目录误报，均为已知取舍）；APK `minSdkVersion 26`、`targetSdkVersion 37`、**无 `INTERNET` 权限、无存储权限**。完整命令与原始输出见 [docs/build-verification.md](docs/build-verification.md)，分层与线程模型见 [docs/architecture.md](docs/architecture.md)，工具链细节见 [docs/environment.md](docs/environment.md)。
+已实测（2026-10-27）：`assembleDebug` 产出 **17.30 MiB / 18,137,290 字节** debug APK（其中约 5.8 MB 是内置楷体字体，见下）；**178 个单元测试全通过**（含 17 张离屏截图、TXT 与 EPUB 各自的「存进度→重开→同一屏」闭环、翻页手势的点击/滑动分区、滚动模式的分块换算、插图的提取/落位/整页编排、EPUB 的 ZIP 穿越 / XXE / 超限 / 损坏用例、PDF 的渲染尺寸换算与页码夹紧、封面抽取与 400px 降采样）；`lintDebug` **0 errors / 4 warnings**（3 条依赖版本提示、1 条自适应图标目录误报，均为已知取舍）；APK `minSdkVersion 26`、`targetSdkVersion 37`、**无 `INTERNET` 权限、无存储权限**。完整命令与原始输出见 [docs/build-verification.md](docs/build-verification.md)，分层与线程模型见 [docs/architecture.md](docs/architecture.md)，工具链细节见 [docs/environment.md](docs/environment.md)。
 
-> **字体与包体**：内置楷体用 [LXGW WenKai Lite](https://github.com/lxgw/LxgwWenKai-Lite)（SIL OFL-1.1，允许随应用分发），字体文件 9.7 MB 放在 `app/src/main/res/font/lxgw_wenkai_lite.ttf`，压缩后约给 APK 增加 5.8 MB——这是当前包体里最大的一块。宋体 / 等线 / 打字机用系统字体族名，不额外占包体；「默认」就是系统无衬线。如果后续要压包体，可行方向是按需下载字体包（但会打破「默认不联网」，需要单独决策），或者只保留一个内置字体。
+> **字体与包体**：内置楷体用 [LXGW WenKai Lite](https://github.com/lxgw/LxgwWenKai-Lite)（SIL OFL-1.1，允许随应用分发），字体文件 9.7 MB 放在 `app/src/main/res/font/lxgw_wenkai_lite.ttf`，压缩后约给 APK 增加 5.8 MB——这是当前包体里最大的一块。宋体 / 等线用系统字体族名，不额外占包体；「默认」就是系统无衬线。如果后续要压包体，可行方向是按需下载字体包（但会打破「默认不联网」，需要单独决策），或者只保留一个内置字体。
 
 尚未验证：导入 / 打开 / 跳转 / 进度恢复的设备端行为（本机模拟器无法启动，详见 docs/build-verification.md）、release 混淆构建、性能门禁。
 
@@ -71,9 +72,9 @@
 |---|---|
 | ![](docs/screenshots/12-reader-scroll.png) | ![](docs/screenshots/13-reader-picture.png) |
 
-| 阅读 · 楷体（内置） | 阅读 · 打字机 |
+| 阅读 · 楷体（内置） | 阅读 · 等线（JVM 上回落默认，见 docs） |
 |---|---|
-| ![](docs/screenshots/14-reader-kai.png) | ![](docs/screenshots/15-reader-typewriter.png) |
+| ![](docs/screenshots/14-reader-kai.png) | ![](docs/screenshots/15-reader-deng.png) |
 
 | PDF · 按页渲染（浅色） | PDF · 上下滚动 |
 |---|---|

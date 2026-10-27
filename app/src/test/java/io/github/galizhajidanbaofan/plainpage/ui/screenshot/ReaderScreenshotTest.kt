@@ -171,12 +171,12 @@ class ReaderScreenshotTest {
         font = io.github.galizhajidanbaofan.plainpage.ui.ReadingFont.KAI,
     )
 
-    /** 打字机：等宽字体在正文里的观感（行距与字距都调过，别让中文挤成一团）。 */
+    /** 等线：细黑 + 补了字距的正文观感（系统无衬线 Light 字重近似）。 */
     @Test
-    fun readerTypewriterFont() = render(
+    fun readerDengFont() = render(
         state = ready(),
         tokens = ThemeTokensCatalog.Light,
-        file = "15-reader-typewriter.png",
-        font = io.github.galizhajidanbaofan.plainpage.ui.ReadingFont.TYPEWRITER,
+        file = "15-reader-deng.png",
+        font = io.github.galizhajidanbaofan.plainpage.ui.ReadingFont.DENG,
     )
 }

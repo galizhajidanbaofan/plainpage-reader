@@ -1,15 +1,12 @@
 package io.github.galizhajidanbaofan.plainpage.ui
 
 import androidx.annotation.StringRes
-import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -243,6 +240,7 @@ private fun PlainPageNavHost(
             ShelfScreen(
                 layout = appearance.shelfLayout,
                 books = shelf,
+                loadCover = { book -> container.coverStore.load(book.coverPath) },
                 importing = importing,
                 onImport = libraryViewModel::import,
                 onOpen = onOpenBook,
@@ -284,18 +282,17 @@ private fun PlainPageNavHost(
             },
             popEnterTransition = {
                 slideInHorizontally(
-                    animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing),
-                    initialOffsetX = { width -> -width / 12 },
-                ) + fadeIn(animationSpec = tween(durationMillis = 200))
+                    animationSpec = tween(durationMillis = 260, easing = LinearOutSlowInEasing),
+                    initialOffsetX = { width -> -width / 14 },
+                ) + fadeIn(animationSpec = tween(durationMillis = 220))
             },
+            // 退场只做「向右滑出」：整页顺着手感方向走完整屏，不再缩放。
+            // 缩放会在纸页边缘露出书架，看起来像画面被压扁；纯位移才像把这一页推回右边。
             popExitTransition = {
-                scaleOut(
-                    animationSpec = tween(durationMillis = 320, easing = FastOutLinearInEasing),
-                    targetScale = 0.96f,
-                ) + slideOutHorizontally(
-                    animationSpec = tween(durationMillis = 320, easing = FastOutLinearInEasing),
-                    targetOffsetX = { width -> width / 10 },
-                ) + fadeOut(animationSpec = tween(durationMillis = 260, delayMillis = 40))
+                slideOutHorizontally(
+                    animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
+                    targetOffsetX = { width -> width },
+                ) + fadeOut(animationSpec = tween(durationMillis = 200, delayMillis = 40))
             },
         ) { entry ->
             val bookId = entry.arguments?.getLong(ARG_BOOK_ID) ?: return@composable

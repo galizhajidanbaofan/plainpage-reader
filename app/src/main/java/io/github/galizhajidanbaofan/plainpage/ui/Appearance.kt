@@ -13,12 +13,12 @@ enum class ReadingMode { PAGED, SCROLL }
 
 /**
  * 正文字体。前三种是中文阅读的实际需求（默认黑体 / 宋体 / 楷体），
- * 后两种偏西文排版（等线细体、等宽打字机）。
+ * 第四种（等线细体）偏西文排版观感。
  *
  * 楷体是系统里没有的，随包带了一款开源楷体（LXGW WenKai Lite，OFL-1.1）；
  * 其余几种用系统内置字族，不额外增加包体。
  */
-enum class ReadingFont { SYSTEM, SONG, KAI, DENG, TYPEWRITER }
+enum class ReadingFont { SYSTEM, SONG, KAI, DENG }
 
 /**
  * 全部可切换外观状态的快照。

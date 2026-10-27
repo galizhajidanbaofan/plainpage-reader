@@ -48,6 +48,7 @@ class ShelfScreenshotTest {
             format = BookFormat.EPUB,
             localPath = "/data/books/1.epub",
             sourceUri = "content://docs/1",
+            coverPath = "/data/books/1.cover.jpg",
             byteSize = 2_300_000L,
             importedAt = now - 30 * day,
             lastOpenedAt = now - 2 * hour,
@@ -99,6 +100,7 @@ class ShelfScreenshotTest {
                 ShelfScreen(
                     layout = layout,
                     books = sample,
+                    loadCover = { book -> if (book.coverPath != null) fakeCover(book.title) else null },
                     importing = false,
                     onImport = {},
                     onOpen = {},
@@ -124,4 +126,37 @@ class ShelfScreenshotTest {
 
     @Test
     fun shelfEmpty() = render(ShelfLayout.LIST, ThemeTokensCatalog.Light, emptyList(), "05-shelf-empty.png")
+
+    /**
+     * 画一张「封面」冒充从 EPUB 里抽出来的图。
+     *
+     * 这里能画出中文，是因为 Robolectric NATIVE 图形会真的调系统字体；
+     * 早先用 Paint 量文字宽度时它返回 0，所以别在这个类里断言文字尺寸，只画不量。
+     */
+    private fun fakeCover(title: String): android.graphics.Bitmap {
+        val width = 600
+        val height = 810
+        val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        canvas.drawColor(0xFF23343C.toInt())
+
+        val ink = android.graphics.Paint().apply {
+            color = 0xFFEFE6D3.toInt()
+            isAntiAlias = true
+        }
+        val glyph = title.take(1)
+        ink.textSize = 190f
+        canvas.drawText(glyph, 68f, 420f, ink)
+
+        ink.textSize = 40f
+        ink.letterSpacing = 0.2f
+        canvas.drawText(title.take(8), 68f, 520f, ink)
+
+        val rule = android.graphics.Paint().apply {
+            color = 0xFFB9A88A.toInt()
+            strokeWidth = 3f
+        }
+        canvas.drawRect(68f, 96f, width - 68f, 99f, rule)
+        return bitmap
+    }
 }

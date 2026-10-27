@@ -48,4 +48,8 @@ interface BookDao {
 
     @Query("UPDATE books SET readingLocation = :encodedLocation WHERE id = :id")
     suspend fun updateReadingLocation(id: Long, encodedLocation: String?)
+
+    /** 封面缓存文件位置；null 表示这本书没有封面（TXT/PDF 或抽图失败）。 */
+    @Query("UPDATE books SET coverPath = :coverPath WHERE id = :id")
+    suspend fun updateCover(id: Long, coverPath: String?)
 }

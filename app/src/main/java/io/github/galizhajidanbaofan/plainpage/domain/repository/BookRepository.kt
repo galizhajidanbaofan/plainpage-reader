@@ -35,4 +35,7 @@ interface BookRepository {
 
     /** 保存阅读进度；[location] 为 null 表示清除进度。 */
     suspend fun saveLocation(id: Long, location: ReadingLocation?)
+
+    /** 记录封面缓存文件的绝对路径；null 表示没有封面。 */
+    suspend fun setCover(id: Long, coverPath: String?)
 }
