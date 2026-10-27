@@ -15,6 +15,34 @@ import java.util.zip.ZipOutputStream
  */
 internal object EpubFixtures {
 
+    /**
+     * 造一张"够大"的 PNG 头。
+     *
+     * 索引层会按体积（≥ 6 KB）与像素尺寸（宽高 ≥ 96）筛掉装饰图，所以测试用的图
+     * 不能还是 1×1 的几十字节。这里只写 PNG 签名 + IHDR 再补零填充到指定体积——
+     * 头部解析、落盘、字节读取都不需要它是完整可解码的 PNG。
+     */
+    fun bigPng(width: Int = 600, height: Int = 800, size: Int = 8_000): ByteArray {
+        val header = java.io.ByteArrayOutputStream()
+        header.write(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A))
+        header.write(byteArrayOf(0, 0, 0, 13))                 // IHDR length
+        header.write("IHDR".toByteArray())
+        header.write(IntBytes(width))
+        header.write(IntBytes(height))
+        header.write(byteArrayOf(8, 6, 0, 0, 0))               // bit depth / color type / ...
+        val bytes = ByteArray(size)
+        val head = header.toByteArray()
+        head.copyInto(bytes)
+        return bytes
+    }
+
+    private fun IntBytes(value: Int): ByteArray = byteArrayOf(
+        (value ushr 24).toByte(),
+        (value ushr 16).toByte(),
+        (value ushr 8).toByte(),
+        value.toByte(),
+    )
+
     data class Chapter(val title: String, val body: String, val file: String)
 
     fun chapter(title: String, body: String, index: Int): Chapter =

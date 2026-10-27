@@ -123,7 +123,10 @@ EPUB 的坐标本来是「href + 章内位置」，阅读页只有一套翻页�
 
 1. `HtmlTextExtractor` 扫到 `<img>` 时在输出里留一个私用区占位符，把 `src`/`alt` 记进 `ExtractedImage`，归一化时再把占位符换成「它在纯文本里的字符下标」；`data:` / `javascript:` / 空地址直接跳过。
    - `<img>` 走 `src`，`<image>` 走 `href` / `xlink:href`——EPUB3 的封面和大量插图是 `<svg><image xlink:href="…"/></svg>` 包起来的，所以 **`svg` 不能整体跳过**，只跳过它里面的 `<text>`（矢量文字）。
-2. `EpubIndexer` 把地址相对所在章目录解析成压缩包内绝对路径（`ZipPaths.resolve`，含百分号解码，越界 `..` 直接丢），偏移换算成全书坐标 `bodyStart + offset`，得到 `PictureRef(at, path, alt)`。
+2. `EpubIndexer` 把地址相对所在章目录解析成压缩包内绝对路径（`ZipPaths.resolve`，含百分号解码，越界 `..` 直接丢），偏移换算成全书坐标 `bodyStart + offset`，得到 `PictureRef(at, path, alt)`。入表前过三道筛：
+   - **整页只有图的页不能整章跳过**：封面页/整页插画的正文是空的，早先按"没文字"跳过，结果这些页上的图连同锚点一起消失（实测某本合集一次丢掉 41 张插图）；
+   - **同一路径只记一次**：装饰图会被每一章重复引用（实测 `star.png` 出现 1125 次），不去重的话真插图会被 `MAX_PICTURES` 截断；
+   - **按体积与像素尺寸丢装饰**：`< 6 KB` 或任一边 `< 96 px` 的都当作分隔线/角花（40×40 的方块 JPEG 能有 9 KB，所以不能只看体积；尺寸用 `ImageHeaders` 读文件头，不解码位图）。
 3. 封面单独补一张：OPF 的 `properties="cover-image"` → `<meta name="cover">` → guide 的 `<reference type="cover">`（只要指向的是图片）。封面通常**不出现在任何正文 XHTML 里**，只从正文找图的话封面永远不显示；正文已经引过同一张图时不重复插，且封面排在正文第一页之前（`PageSlots.BEFORE_FIRST_PAGE`）。
 4. 取图时大小写兜底：href 写 `COVER.JPG`、条目叫 `Cover.jpg` 是跨平台打包的常见坑，`EpubArchive` 先精确匹配、再按小写匹配一次。
 5. 翻页模式：`PageSlots.build` 把「正文屏」和「插图纸」排成一条序列——偏移落在某页窗口内的图排在该页之后，落在书末的图追加在最后，**永不丢图**；图屏 → `PicturePage`（等比例 `ContentScale.Fit` + 图注）。

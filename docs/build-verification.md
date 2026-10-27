@@ -413,3 +413,49 @@ PROBE pictureDecoded=843x1200
 - 抽封面在「封面是 WebP / 带 alpha 的 PNG / CMYK JPEG」上的表现：只在本轮这一本真实书上验证过解 PNG。
 - 扫描版大 PDF、竖排 EPUB、CSS 复杂排版的插图位置：未测量。
 - release 构建与混淆、仪器测试：仍未做。
+
+# 第九轮实测（合集类 EPUB 的正文插图修复，2026-10-27）
+
+## 1. 命令与结果
+
+```bash
+rm -rf app/build/test-results
+./gradlew --offline app:testDebugUnitTest app:lintDebug app:assembleDebug
+```
+
+- **BUILD SUCCESSFUL**（增量 31s）。
+- 单元测试：**187 个 / 28 个类，0 失败**。比上一轮 178 个多 9 个：`ImageHeadersTest` 6 例（PNG / JPEG / GIF / WebP / 未知格式 / 截断数据）、`EpubImageRegressionTest` 新增 3 例（纯图页仍出图、40×40 装饰被跳过、同一路径只记一次）。
+- `lintDebug`：**0 errors / 4 warnings**（`GradleDependency`×1、`NewerVersionAvailable`×2、`ObsoleteSdkInt`×1），无新增。
+- 产物：**18,197,763 字节（17.35 MiB）**。
+
+## 2. 真实样本验收（《全知读者视角》1-10 合集，10.5 MB / 268 条目）
+
+临时探针（跑完即删）输出：
+
+```
+PROBE title=全知读者视角 chars=2084452
+PROBE chapters=156 first=cover
+PROBE pictures=52
+PROBE pic at=6 bytes=339592 dims=1400x1986 alt=cover cover.jpg
+PROBE pic at=16 bytes=339592 dims=1400x1986 alt=null 1/OEBPS/Images/cover.jpg
+PROBE pic at=34 bytes=151699 dims=1400x1963 alt=null 1/OEBPS/Images/titlepage.jpg
+PROBE pic at=43 bytes=145295 dims=1400x1963 alt=null 1/OEBPS/Images/content.jpg
+PROBE unreadable=0 of 52
+```
+
+修之前同一本书：`chapters=94`、`pictures=4`（只有封面 + 3 张 40×40 装饰方块），即 41 张真插图全部丢失。
+
+## 3. 本轮新增的坑
+
+| 现象 | 根因 | 处理 |
+|---|---|---|
+| 整页插图的图全都不见 | `EpubIndexer` 用「正文为空就跳过整章」判断，而纯图页的正文恰好是空串 | 改成「正文为空**且**没有图片」才跳过；纯图页保留，图与锚点都在 |
+| 插图列表被装饰图占满 | 合集类 EPUB 把同一张 `star.png`（3.5 KB）在每章重复引用 1125 次，`MAX_PICTURES=600` 直接被装饰图占满 | 按路径去重，一张图只占一页；同时按体积（< 6 KB）与像素边长（< 96）判定装饰 |
+| 40×40 方块 JPEG 有 9 KB，按体积筛不掉 | 体积与"是不是插图"没有稳定关系 | 新增 `ImageHeaders` 读 PNG/JPEG/GIF/WebP 文件头拿宽高，索引阶段不解码位图 |
+| `readBytesIfPresent` 读图片头直接抛「内部文件过大」 | 它遇到条目声明体积超过 `maxBytes` 就抛 `TOO_LARGE`（设计给"整文件读取"用） | 新增 `EpubArchive.readPrefixIfPresent`：只读前 N 字节，不因文件大而失败 |
+| 旧测试用 1×1 PNG 当插图，加了尺寸筛之后全挂 | 测试 fixture 需要跟着生产规则走 | `EpubFixtures.bigPng(width, height, size)` 造 600×800、≥ 6 KB 的 PNG 头 |
+
+## 4. 仍生效的未验证清单
+
+- 设备端仍未跑过：52 张 1400px 宽的插图纸在真机上翻页的解码耗时只能靠 LRU 与降采样兜底，未实测。
+- 扫描版 PDF、竖排 EPUB、CSS 背景图（`background-image`）里的插图：仍未支持，也未测试。

@@ -41,6 +41,17 @@ internal object EpubLimits {
     /** 小于这个体积的图基本是项目符号、分隔线、装饰角花，不值得占一页。 */
     const val MIN_PICTURE_BYTES: Long = 6 * 1024
 
+    /**
+     * 宽或高小于这个像素数的图按装饰处理。
+     *
+     * 只靠体积判断会漏：40×40 的装饰方块 JPEG 可以比真插图还大（实测 9 KB）。
+     * 真插图（哪怕是小尺寸的章节头图）通常也在 200px 以上。
+     */
+    const val MIN_PICTURE_EDGE: Int = 96
+
+    /** 读图片头用的字节数：PNG 只要 24 字节，JPEG 要往后翻到 SOFn，64 KB 足够。 */
+    const val MAX_PICTURE_HEADER_BYTES: Int = 64 * 1024
+
     /** 全书最多认这么多张插图；再多就不再记（避免漫画类 EPUB 把锚点表撑爆）。 */
     const val MAX_PICTURES: Int = 600
 }

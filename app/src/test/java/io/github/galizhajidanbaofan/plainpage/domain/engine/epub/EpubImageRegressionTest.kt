@@ -10,7 +10,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
-import java.util.Base64
 
 /**
  * 「书能打开、字能读，但图一张都不显示」的回归集。
@@ -25,9 +24,8 @@ class EpubImageRegressionTest {
     @get:Rule
     val temp = TemporaryFolder()
 
-    private fun pngBytes(): ByteArray = Base64.getDecoder().decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-    )
+    /** 索引层会筛掉「小图」与「装饰图」，所以测试图要够大、够像素。 */
+    private fun pngBytes(): ByteArray = EpubFixtures.bigPng()
 
     private fun book(path: String) = Book(
         id = 1L,
@@ -139,6 +137,71 @@ class EpubImageRegressionTest {
                 1,
                 engine.pictures.count { it.path.endsWith("cover.jpg") },
             )
+        } finally {
+            engine.close()
+        }
+    }
+
+    @Test
+    fun imageOnlyPageStillContributesItsPicture() {
+        // 整页插图页：正文一个字都没有，只有 svg + image。
+        // 早先按「正文为空」整章跳过，结果这些页上的图连锚点一起消失。
+        val file = EpubFixtures.build(
+            temp.root,
+            chapters = listOf(
+                EpubFixtures.chapter("插页", """<svg xmlns="http://www.w3.org/2000/svg"><image xlink:href="../Images/plate.jpg"/></svg>""", 1),
+                EpubFixtures.chapter("第一章", "<p>甲一，雪落下来。</p>", 2),
+            ),
+            extraEntries = mapOf("Images/plate.jpg" to pngBytes()),
+        )
+
+        val engine = open(file)
+        try {
+            val plate = engine.pictures.firstOrNull { it.path.endsWith("plate.jpg") }
+            assertNotNull("纯图页的插图不能被丢掉", plate)
+        } finally {
+            engine.close()
+        }
+    }
+
+    @Test
+    fun tinyDecorationIsSkipped() {
+        val file = EpubFixtures.build(
+            temp.root,
+            chapters = listOf(
+                EpubFixtures.chapter(
+                    "第一章",
+                    """<p>甲一。</p><img src="../Images/ornament.png"/><p>乙二。</p>""",
+                    1,
+                ),
+            ),
+            extraEntries = mapOf("Images/ornament.png" to EpubFixtures.bigPng(width = 40, height = 40)),
+        )
+
+        val engine = open(file)
+        try {
+            assertTrue(
+                "40×40 的分隔线不该占一整屏",
+                engine.pictures.none { it.path.endsWith("ornament.png") },
+            )
+        } finally {
+            engine.close()
+        }
+    }
+
+    @Test
+    fun repeatedPathIsCountedOnce() {
+        // 有的书把同一张装饰图在每章重复引用上百次；按路径去重后只保留第一次出现的位置。
+        val body = (1..30).joinToString("") { """<p>第 $it 段。</p><img src="../Images/stamp.png"/>""" }
+        val file = EpubFixtures.build(
+            temp.root,
+            chapters = listOf(EpubFixtures.chapter("第一章", body, 1)),
+            extraEntries = mapOf("Images/stamp.png" to pngBytes()),
+        )
+
+        val engine = open(file)
+        try {
+            assertEquals(1, engine.pictures.count { it.path.endsWith("stamp.png") })
         } finally {
             engine.close()
         }

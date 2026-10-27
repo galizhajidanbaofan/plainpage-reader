@@ -58,6 +58,11 @@ internal object EpubIndexer {
         val builder = StringBuilder()
         val chapters = ArrayList<EpubChapter>()
         val pictures = ArrayList<PictureRef>()
+        // 同一张图在正文里被引用多次是常态：星标、分隔线、题花这类装饰图在有些书里
+        // 会被每一章重复引用上百次（实测某本合集里同一个 3 KB 的 star.png 出现 1125 次）。
+        // 若每次引用都插一页"全屏插图"，插图列表很快被装饰图占满、真插图反而被截断，
+        // 所以这里按路径去重：一张图只占一页，位置取它第一次出现的地方。
+        val seenPictures = HashSet<String>()
         var truncated = false
 
         for (href in pkg.spine) {
@@ -68,7 +73,9 @@ internal object EpubIndexer {
             val markup = archive.readTextIfPresent(href, EpubLimits.MAX_CHAPTER_BYTES) ?: continue
             val extracted = HtmlTextExtractor.extract(markup)
             val body = extracted.text
-            if (body.isEmpty()) continue
+            // 只有图、没有字的页（封面页、整页插画页）正文是空的，但这种页恰恰是插图的所在地：
+            // 若在这里按"没文字"整页跳过，图和它的锚点会一起消失（实测某本合集丢了 41 张插图）。
+            if (body.isEmpty() && extracted.images.isEmpty()) continue
 
             val title = titles[href]
                 ?: ZipPaths.stemOf(href).ifBlank { "第 ${chapters.size + 1} 节" }
@@ -82,6 +89,22 @@ internal object EpubIndexer {
             val chapterDir = href.substringBeforeLast('/', "")
             extracted.images.forEach { image ->
                 val path = ZipPaths.resolve(chapterDir, image.src) ?: return@forEach
+                if (!seenPictures.add(path.lowercase())) return@forEach
+                // 体积过小的多半是项目符号 / 分隔线 / 角花，单独占一页只会变成空白页；
+                // 体积过大的按畸形文件处理，渲染阶段也读不出来。
+                val size = archive.sizeOf(path) ?: return@forEach
+                if (size < EpubLimits.MIN_PICTURE_BYTES || size > EpubLimits.MAX_PICTURE_BYTES) {
+                    return@forEach
+                }
+                // 再看像素尺寸：体积正常的 40×40 装饰方块也不该占一页。
+                val header = archive.readPrefixIfPresent(path, EpubLimits.MAX_PICTURE_HEADER_BYTES)
+                val dimensions = header?.let(ImageHeaders::sizeOf)
+                if (dimensions != null &&
+                    (dimensions.first < EpubLimits.MIN_PICTURE_EDGE ||
+                        dimensions.second < EpubLimits.MIN_PICTURE_EDGE)
+                ) {
+                    return@forEach
+                }
                 pictures.add(
                     PictureRef(
                         at = bodyStart + image.offset.coerceIn(0, body.length),

@@ -41,9 +41,8 @@ class EpubReaderEngineTest {
 
 
     /** 1x1 的合法 PNG：拿来验"能不能从压缩包里取出来解码"。 */
-    private fun pngBytes(): ByteArray = java.util.Base64.getDecoder().decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-    )
+    /** 索引层会筛掉小图与装饰图，测试图必须够大（≥ 6 KB、边长 ≥ 96）。 */
+    private fun pngBytes(): ByteArray = EpubFixtures.bigPng()
 
     /** 带一张插图的 EPUB：正文两段，图挂在第一段之后。 */
     private fun fixtureWithImage(): File = EpubFixtures.build(

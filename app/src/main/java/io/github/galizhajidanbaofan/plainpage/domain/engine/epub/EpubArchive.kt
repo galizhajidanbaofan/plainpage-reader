@@ -83,6 +83,26 @@ internal class EpubArchive(private val file: File) : Closeable {
         }
     }
 
+    /**
+     * 只读文件头部的 [maxBytes] 个字节，用于判断图片尺寸这类"看一眼就够"的场景。
+     *
+     * 与 [readBytesIfPresent] 的区别：**不会因为文件大就抛异常**。插图动辄几 MB，
+     * 但我们只需要前几十 KB 的头部字段。
+     */
+    fun readPrefixIfPresent(path: String, maxBytes: Int): ByteArray? {
+        val entry = entryFor(path) ?: return null
+        return zip.getInputStream(entry).use { input ->
+            val buffer = ByteArray(maxBytes)
+            var total = 0
+            while (total < maxBytes) {
+                val read = input.read(buffer, total, maxBytes - total)
+                if (read < 0) break
+                total += read
+            }
+            buffer.copyOf(total)
+        }
+    }
+
     fun readBytes(path: String, maxBytes: Int): ByteArray =
         readBytesIfPresent(path, maxBytes)
             ?: throw EpubFormatException(EpubFormatException.Kind.CORRUPTED, "EPUB 缺少文件：$path")
