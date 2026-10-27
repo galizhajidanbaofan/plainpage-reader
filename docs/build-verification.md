@@ -459,3 +459,44 @@ PROBE unreadable=0 of 52
 
 - 设备端仍未跑过：52 张 1400px 宽的插图纸在真机上翻页的解码耗时只能靠 LRU 与降采样兜底，未实测。
 - 扫描版 PDF、竖排 EPUB、CSS 背景图（`background-image`）里的插图：仍未支持，也未测试。
+
+
+## 第十轮实测（正文占位符与插图错位修复，2026-10-27）
+
+用户反馈「正文里出现 cover / titlepage 之类的占位符文字但没有图，封面图却插到第二页」，用同一本合集样本复现并修复。
+
+### 1. 命令与结果
+
+```bash
+export JAVA_HOME=.../jdk21 ANDROID_HOME=.../.toolchain ANDROID_USER_HOME=.../android-home
+./gradlew --offline app:testDebugUnitTest app:lintDebug app:assembleDebug
+# BUILD SUCCESSFUL
+# tests=190 failures=0（28 个类）
+# lint: 0 errors / 4 warnings
+# APK: 18,198,187 字节（17.36 MiB）
+```
+
+### 2. 真实样本探针（修复后，临时测试文件已删除）
+
+```
+PROBE chars=2082229 chapters=94 pictures=52
+PROBE titles=[Prologue. 在灭亡的世界中存活的三种方法, 第 2 节, Episode 1. 付费服务开始, ...]
+PROBE pics=[(0, cover.jpg), (0, titlepage.jpg), (0, content.jpg), (210060, DM.jpg), ...]
+PROBE head=Prologue. 在灭亡的世界中存活的三种方法
+想要在灭亡的世界中存活下来，有三种方法。...
+PROBE junk={titlepage=false, cover.xhtml=false, content.xhtml=false, chapter1=false}
+```
+
+### 3. 根因与处理
+
+| 现象 | 根因 | 处理 |
+|---|---|---|
+| 正文里出现 `cover` / `titlepage` 字样 | 纯图页正文为空，早期版本会补一行「文件名当标题」当正文，图却被锚在那行之后 | 纯图页只记图片、不写标题、不建章节；图锚在当时的全书偏移上 |
+| 目录/正文出现 `ch1`、`9` 这种名字 | `EpubOutlineParser` 的 spine 兜底用 `ZipPaths.stemOf(href)` 当标题 | 兜底标题改成「第 N 节」，文件名不进目录也不进正文 |
+| 同一句标题连出现两次 | XHTML 首行 `<h2>` 与 NCX 标题相同，两边都拼进正文 | 首行与目录标题完全一致时丢掉正文那一行，并同步扣减图片偏移 |
+| 封面图看起来"跑到第二页" | 上面两条叠加：第一页是一条假标题，图被排到它后面 | 同上；修复后纯图页在开头连续成页，正文从第一章开始 |
+
+### 4. 仍生效的未验证清单
+
+- 设备端仍未跑过；52 张插图纸在真机上的解码耗时只能靠 LRU 与降采样兜底。
+- EPUB 自带字号/颜色/粗斜体：P0 不解析（纯文本 + 统一排版），属 P1 的排版模型改造，已在 `docs/architecture.md` 写明代价。

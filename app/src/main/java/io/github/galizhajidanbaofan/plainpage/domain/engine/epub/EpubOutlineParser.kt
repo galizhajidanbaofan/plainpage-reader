@@ -26,10 +26,11 @@ internal object EpubOutlineParser {
         val fromNav = pkg.navPath?.let { readNav(archive, it) }.orEmpty()
         if (fromNav.isNotEmpty()) return fromNav
 
+        // 兜底不用文件名当标题：真实书里这些名字是 "ch1"、"cover"、"titlepage"、"9"，
+        // 落到目录和正文里就是占位符一样的乱码，宁可给中性序号。
         return pkg.spine.mapIndexed { index, href ->
-            val stem = ZipPaths.stemOf(href)
             EpubNavPoint(
-                title = if (stem.isBlank()) "第 ${index + 1} 节" else stem,
+                title = "第 ${index + 1} 节",
                 href = href,
                 level = 0,
             )

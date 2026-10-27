@@ -102,8 +102,8 @@ EPUB 的坐标本来是「href + 章内位置」，阅读页只有一套翻页�
 
 1. `EpubArchive` 打开 ZIP，只认 `mimetype`/`META-INF/container.xml`；
 2. `EpubPackageParser` 解 OPF：`dc:title`、`dc:creator`、manifest、spine（`linear="no"` 跳过）；
-3. 按 spine 顺序逐章读 XHTML，`HtmlTextExtractor` 去掉标签（跳过 `head`/`script`/`style`/`iframe`/`object` 与 svg 里的 `<text>`，块级标签换行，实体解码），拼成全书文本并记录每章 `[charStart, charEnd)`；同时把 `<img>` / `<image>` 的地址、`alt` 与「本该出现在第几个字之间」记下来，留给插图用；
-4. `EpubOutlineParser` 取目录：NCX → EPUB3 `nav[epub:type=toc]` → spine 文件名兜底；
+3. 按 spine 顺序逐章读 XHTML，`HtmlTextExtractor` 去掉标签（跳过 `head`/`script`/`style`/`iframe`/`object` 与 svg 里的 `<text>`，块级标签换行，实体解码），拼成全书文本并记录每章 `[charStart, charEnd)`；同时把 `<img>` / `<image>` 的地址、`alt` 与「本该出现在第几个字之间」记下来，留给插图用。两条细节：**纯图页（正文为空）不建章节**，只把图记到当前偏移；**XHTML 首行标题与目录标题相同时丢掉正文里那一行**，否则同一句标题会连着出现两次；
+4. `EpubOutlineParser` 取目录：NCX → EPUB3 `nav[epub:type=toc]` → spine 兜底（兜底标题是「第 N 节」，**不拿文件名当标题**——真实书里那是 `ch1`、`cover`、`titlepage`、`9`，落到目录和正文里就是占位符）；
 5. 进度双向换算：`positionOf(offset)` 给出 `ReadingLocation.Epub(href, 章内百分比)`，`charOffsetOf(locator)` 换回全书偏移。
 
 安全性（EPUB 是外部来的不可信文件）：
@@ -116,6 +116,8 @@ EPUB 的坐标本来是「href + 章内位置」，阅读页只有一套翻页�
 | 正文过大 | 全书文本上限 `EpubLimits.MAX_TOTAL_CHARS`，超出后剩余章节不读入并置 `truncated`（对外表现为 `lossyDecoding = true`），界面提示「可能不完整」 |
 
 代价与取舍：样式与脚注跳转在 P0 仍不进文本流（只留文字），换来的是「翻页与进度和 TXT 完全同构」。图片则是例外——它不占字符，但读者要看到它，所以用「锚点 + 独占一屏」的方式接进来，见下。
+
+**已知限制（P1 再补）**：EPUB 自带的**字号、颜色、粗体斜体、缩进、居中**在 P0 全部丢失——正文是纯文本 + 一套统一排版。要还原这些不能只改渲染层：`PaginatedEngine.readText` 返回的是 `String`，字符窗口按字符数切页，样式一旦存在就必须改成「带样式区间的字符流」（`List<Span(start, end, style)>` 或 `AnnotatedString` 拼装），分页、目录跳转、进度百分比都要跟着按字符偏移重建。这是一次跨层的模型改造，属于 P1 的页面设置/排版完善，不在 P0 收口范围内。
 
 ### EPUB 插图：记锚点，不插进文本流
 

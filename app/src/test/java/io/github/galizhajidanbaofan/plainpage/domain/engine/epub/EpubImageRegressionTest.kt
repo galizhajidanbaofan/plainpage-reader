@@ -165,6 +165,72 @@ class EpubImageRegressionTest {
     }
 
     @Test
+    fun imageOnlyPageDoesNotLeakFileNameIntoText() = runBlocking {
+        // 封面页/整页插画页不能往正文里写「文件名当标题」：
+        // 读者会看到 "cover"、"titlepage" 这种占位符式的字，而图却排在下一页。
+        val file = EpubFixtures.build(
+            temp.root,
+            chapters = listOf(
+                EpubFixtures.chapter("封面", """<img src="../Images/cover.jpg"/>""", 1),
+                EpubFixtures.chapter("第一章", "<p>甲一，雪落下来。</p>", 2),
+            ),
+            coverEntry = "Images/cover.jpg",
+            extraEntries = mapOf("Images/cover.jpg" to pngBytes()),
+        )
+
+        val engine = open(file)
+        try {
+            val outline = engine.loadOutline()
+            assertTrue("封面页不该进目录", outline.none { it.title.contains("ch1") })
+            val text = engine.readText(0, engine.charCount)
+            assertTrue("正文里不该出现文件名", !text.contains("ch1"))
+            val cover = engine.pictures.first()
+            assertEquals("封面锚在全书开头，第一屏之前", 0, cover.at)
+        } finally {
+            engine.close()
+        }
+    }
+
+    @Test
+    fun headingDuplicatedByOutlineIsPrintedOnce() = runBlocking {
+        // 真实书里 XHTML 的第一行常是 <h2>章节标题</h2>，而 NCX 标题就是同一句话：
+        // 两个都拼进正文就会出现「第一章 雪夜」连续两行。
+        val file = EpubFixtures.build(
+            temp.root,
+            chapters = listOf(
+                EpubFixtures.chapter("第一章 雪夜", "<h2>第一章 雪夜</h2><p>雪落下来。</p>", 1),
+            ),
+        )
+
+        val engine = open(file)
+        try {
+            val text = engine.readText(0, engine.charCount)
+            assertEquals("标题只应出现一次：$text", 1, Regex("第一章 雪夜").findAll(text).count())
+            assertTrue("正文必须保留", text.contains("雪落下来"))
+        } finally {
+            engine.close()
+        }
+    }
+
+    @Test
+    fun chapterWithoutOutlineTitleGetsNeutralFallback() = runBlocking {
+        val file = EpubFixtures.build(
+            temp.root,
+            chapters = listOf(EpubFixtures.chapter("卷内页", "<p>正文。</p>", 1)),
+            withNcx = false,
+        )
+
+        val engine = open(file)
+        try {
+            val outline = engine.loadOutline()
+            assertEquals("第 1 节", outline.single().title)
+            assertTrue("正文不能以文件名开头", !engine.readText(0, 8).startsWith("ch1"))
+        } finally {
+            engine.close()
+        }
+    }
+
+    @Test
     fun tinyDecorationIsSkipped() {
         val file = EpubFixtures.build(
             temp.root,

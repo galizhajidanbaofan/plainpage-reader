@@ -64,7 +64,8 @@ class EpubOutlineParserTest {
         val file = EpubFixtures.build(temp.root, chapters = TWO_CHAPTERS, withNcx = false, withNav = false)
         EpubArchive(file).use { archive ->
             val entries = EpubOutlineParser.read(archive, EpubPackageParser.read(archive))
-            assertEquals(listOf("ch1", "ch2"), entries.map { it.title })
+            // 兜底标题不用文件名（"ch1" 这种字样出现在目录和正文里像占位符）。
+            assertEquals(listOf("第 1 节", "第 2 节"), entries.map { it.title })
             assertTrue(entries.all { it.level == 0 })
         }
     }

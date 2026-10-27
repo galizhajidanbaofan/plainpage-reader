@@ -46,6 +46,9 @@ internal class EpubIndex(
 /** 把 spine 里的 XHTML 依次抽成文本，并记录每章的字符区间。 */
 internal object EpubIndexer {
 
+    /** 章节之间的分隔换行；抽成常量是因为换行字符字面量手写容易出错。 */
+    private const val NEWLINE: Char = 10.toChar()
+
     fun build(archive: EpubArchive, pkg: EpubPackageInfo): EpubIndex {
         val outline = EpubOutlineParser.read(archive, pkg)
         val titles = LinkedHashMap<String, String>()
@@ -77,16 +80,8 @@ internal object EpubIndexer {
             // 若在这里按"没文字"整页跳过，图和它的锚点会一起消失（实测某本合集丢了 41 张插图）。
             if (body.isEmpty() && extracted.images.isEmpty()) continue
 
-            val title = titles[href]
-                ?: ZipPaths.stemOf(href).ifBlank { "第 ${chapters.size + 1} 节" }
-            if (builder.isNotEmpty()) builder.append('\n')
-            val start = builder.length
-            builder.append(title.trim()).append('\n')
-            builder.append(body)
-            // 图片偏移 = 本章起点 + 标题行长度 + 它在整章文本里的位置。
-            // 解析不出来的引用（绝对 URL、data:、越界的 ../）直接丢：坏引用不该毁掉整本书。
-            val bodyStart = start + title.trim().length + 1
             val chapterDir = href.substringBeforeLast('/', "")
+            val pagePictures = ArrayList<PictureRef>()
             extracted.images.forEach { image ->
                 val path = ZipPaths.resolve(chapterDir, image.src) ?: return@forEach
                 if (!seenPictures.add(path.lowercase())) return@forEach
@@ -105,13 +100,42 @@ internal object EpubIndexer {
                 ) {
                     return@forEach
                 }
-                pictures.add(
-                    PictureRef(
-                        at = bodyStart + image.offset.coerceIn(0, body.length),
-                        path = path,
-                        alt = image.alt,
-                    ),
-                )
+                pagePictures.add(PictureRef(at = image.offset, path = path, alt = image.alt))
+            }
+
+            if (body.isEmpty()) {
+                // 纯图页：不写标题、不占正文、也不进目录。
+                // 早先给它补一个「文件名当标题」的正文行，结果正文里冒出 cover / titlepage 这种字样，
+                // 而图被锚在那一行之后 → 看起来就是"文字有占位符、图跑到下一页"。
+                pagePictures.forEach { pictures.add(it.copy(at = builder.length)) }
+                continue
+            }
+
+            // 目录里没有这一章（合并型 EPUB 的卷内页很常见）时，不要拿文件名当标题：
+            // "9"、"cover"、"titlepage" 落到正文里就是乱码一样的存在。
+            val title = titles[href] ?: "第 ${chapters.size + 1} 节"
+            val titleLine = title.trim()
+            // XHTML 里常常自带头一行大标题，而目录标题就是它：直接拼会看到标题出现两次。
+            // 只在完全相同时丢弃，避免把"第一章 雪夜"和"雪夜"这种近似的正文首句误删。
+            var bodyText = body
+            var skipped = 0
+            val firstLineEnd = bodyText.indexOf(NEWLINE)
+            val firstLine = if (firstLineEnd >= 0) bodyText.substring(0, firstLineEnd) else bodyText
+            if (firstLine.trim() == titleLine) {
+                skipped = if (firstLineEnd >= 0) firstLineEnd + 1 else bodyText.length
+                bodyText = if (firstLineEnd >= 0) bodyText.substring(firstLineEnd + 1) else ""
+            }
+
+            if (builder.isNotEmpty()) builder.append(NEWLINE)
+            val start = builder.length
+            builder.append(titleLine).append(NEWLINE)
+            builder.append(bodyText)
+            // 图片偏移 = 本章起点 + 标题行长度 + 它在整章文本里的位置（扣掉被丢弃的重复标题行）。
+            // 解析不出来的引用（绝对 URL、data:、越界的 ../）直接丢：坏引用不该毁掉整本书。
+            val bodyStart = start + titleLine.length + 1
+            pagePictures.forEach { ref ->
+                val inBody = (ref.at - skipped).coerceIn(0, bodyText.length)
+                pictures.add(ref.copy(at = bodyStart + inBody))
             }
             chapters.add(
                 EpubChapter(
